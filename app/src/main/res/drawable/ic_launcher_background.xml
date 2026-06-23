@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="108"
+                android:endY="108"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear">
+                <item
+                    android:color="#FFF9C4"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FFD180"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Beautiful organic bubble pattern for children's interest -->
+    <path
+        android:fillColor="#10FFFFFF"
+        android:pathData="M15,20 A10,10 0 1,1 15,40 A10,10 0 1,1 15,20" />
+    <path
+        android:fillColor="#15FFFFFF"
+        android:pathData="M90,75 A15,15 0 1,1 90,105 A15,15 0 1,1 90,75" />
+    <path
+        android:fillColor="#10FFFFFF"
+        android:pathData="M80,25 A8,8 0 1,1 80,41 A8,8 0 1,1 80,25" />
+</vector>

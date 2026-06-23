@@ -1,0 +1,6 @@
+{
+  "name": "우리아이 독서기록장",
+  "description": "아이의 독서를 체계적으로 기록하고 포트폴리오로 성장 과정을 관리할 수 있는 맞춤형 독서기록장입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
