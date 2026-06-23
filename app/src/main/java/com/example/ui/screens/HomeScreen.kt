@@ -199,7 +199,10 @@ fun HomeScreen(
 
                         // Week Days
                         val weekDays = listOf("일", "월", "화", "수", "목", "금", "토")
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             weekDays.forEachIndexed { index, day ->
                                 val color = when (index) {
                                     0 -> Color(0xFFE57373) // Red for Sun
@@ -222,7 +225,12 @@ fun HomeScreen(
                         // Calendar Grid Days
                         val days = remember(calendar) { generateCalendarDays(calendar) }
                         days.chunked(7).forEach { week ->
-                            Row(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 week.forEach { date ->
                                     if (date == null) {
                                         Box(modifier = Modifier.weight(1f))
@@ -567,15 +575,16 @@ fun CalendarDayCell(
 
     val cellBackground = when {
         isSelected -> Color(0xFFEADDFF)
-        isToday -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
         sessions.isNotEmpty() -> Color(0xFFF3EDF7)
-        else -> Color.Transparent
+        else -> Color(0xFFFBF8FD)
     }
 
     val borderStroke = when {
-        isSelected -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-        isToday -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-        else -> null
+        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        isToday -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+        sessions.isNotEmpty() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+        else -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
     }
 
     val textColor = when {
@@ -583,57 +592,97 @@ fun CalendarDayCell(
         else -> baseTextColor
     }
 
-    Box(
+    Card(
         modifier = modifier
             .aspectRatio(1f)
-            .padding(2.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(cellBackground)
-            .then(if (borderStroke != null) Modifier.border(borderStroke, RoundedCornerShape(12.dp)) else Modifier)
-            .clickable(onClick = onClick)
-            .padding(2.dp),
-        contentAlignment = Alignment.TopCenter
+            .padding(1.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = cellBackground
+        ),
+        border = borderStroke,
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = when {
+                isSelected -> 4.dp
+                sessions.isNotEmpty() -> 2.dp
+                isToday -> 3.dp
+                else -> 0.5.dp
+            }
+        ),
+        onClick = onClick
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = dayOfMonth.toString(),
-                fontSize = 11.sp,
-                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-                color = textColor,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-
-            // Content Preview Inside Calendar Cell (Dot indicators or text)
             if (sessions.isNotEmpty()) {
-                val bookTitle = books.find { it.id == sessions.first().bookId }?.title ?: ""
-                if (bookTitle.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Default.Book,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                    modifier = Modifier
+                        .size(36.dp)
+                        .align(Alignment.Center)
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = bookTitle,
-                        fontSize = 8.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6750A4),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 2.dp, end = 2.dp, bottom = 2.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF6750A4))
-                            .padding(bottom = 4.dp)
+                        text = dayOfMonth.toString(),
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected || isToday || sessions.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                        color = textColor,
+                        textAlign = TextAlign.Center
                     )
                 }
-            } else {
-                Spacer(modifier = Modifier.height(10.dp))
+
+                if (sessions.isNotEmpty()) {
+                    val book = books.find { it.id == sessions.first().bookId }
+                    if (book != null) {
+                        if (!book.coverUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = book.coverUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(width = 16.dp, height = 22.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .border(0.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(3.dp)),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = book.title.take(1),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF6750A4),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .background(Color(0xFFEADDFF), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF6750A4))
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
             }
         }
     }

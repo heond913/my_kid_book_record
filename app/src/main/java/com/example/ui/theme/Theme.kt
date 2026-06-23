@@ -49,21 +49,13 @@ private val LightColorScheme =
 
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = true,
+  darkTheme: Boolean = false, // Force false to always show light background and bright yellow buttons
+  // Dynamic color is disabled by default to respect custom theme colors
+  dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
-  val colorScheme =
-    when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-        val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
+  val colorScheme = LightColorScheme // Force LightColorScheme to satisfy user's white background & yellow buttons requirement
 
-      darkTheme -> DarkColorScheme
-      else -> LightColorScheme
-    }
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }

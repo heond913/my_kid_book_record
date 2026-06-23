@@ -11,9 +11,9 @@ val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
 // Bento Grid Theme Colors
-val BentoPrimary = Color(0xFF6750A4)
-val BentoOnPrimary = Color(0xFFFFFFFF)
-val BentoPrimaryContainer = Color(0xFFEADDFF)
+val BentoPrimary = Color(0xFFFFD600) // Bright Yellow
+val BentoOnPrimary = Color(0xFF1C1B1F) // Deep Charcoal for high contrast readability
+val BentoPrimaryContainer = Color(0xFFFFF9C4) // Very soft light yellow
 val BentoOnPrimaryContainer = Color(0xFF21005D)
 
 val BentoSecondary = Color(0xFF625B71)
@@ -26,12 +26,12 @@ val BentoOnTertiary = Color(0xFFFFFFFF)
 val BentoTertiaryContainer = Color(0xFFFFD8E4)
 val BentoOnTertiaryContainer = Color(0xFF31111D)
 
-val BentoBackground = Color(0xFFFBF8FD)
+val BentoBackground = Color(0xFFFFFFFF) // Pure White Background
 val BentoOnBackground = Color(0xFF1C1B1F)
 
-val BentoSurface = Color(0xFFFFFFFF)
+val BentoSurface = Color(0xFFFFFFFF) // Pure White Surface
 val BentoOnSurface = Color(0xFF1C1B1F)
-val BentoSurfaceVariant = Color(0xFFF3EDF7)
+val BentoSurfaceVariant = Color(0xFFF5F5F5) // Clean very light gray
 val BentoOnSurfaceVariant = Color(0xFF49454F)
 
 val BentoOutline = Color(0xFFCAC4D0)
