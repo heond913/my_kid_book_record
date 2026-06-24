@@ -12,10 +12,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
@@ -30,11 +35,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Book
+import com.example.data.api.BookSearchResult
 import com.example.ui.viewmodel.BookViewModel
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +55,10 @@ fun SearchScreen(
     val sessions by viewModel.sessions.collectAsState()
     val fastAccessBooks by viewModel.fastAccessBooks.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
+
+    // [요구사항 1] 외부 검색 및 로딩 상태 스트림 구독
+    val onlineSearchResults by viewModel.searchResults.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
 
     val childName by viewModel.childNameState.collectAsState()
     val childGender by viewModel.childGenderState.collectAsState()
@@ -63,6 +75,12 @@ fun SearchScreen(
     }
 
     var searchQuery by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    var isSearchFieldFocused by remember { mutableStateOf(false) }
+    
+    // [요구사항 2] Bento 스타일의 모드 전환 탭(Tab) 레이아웃 도입
+    var selectedTabStr by remember { mutableStateOf("MY_LIBRARY") }
+
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedStatus by remember { mutableStateOf<String?>(null) }
     var selectedTag by remember { mutableStateOf<String?>(null) }
@@ -110,7 +128,7 @@ fun SearchScreen(
             ) {
                 Column {
                     Text(
-                        text = "내 서재 검색 필터",
+                        text = if (selectedTabStr == "ONLINE_SEARCH") "온라인 새 도서 탐색" else "내 서재 검색 필터",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -118,7 +136,7 @@ fun SearchScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$childNameWithJosa 서재 검색",
+                        text = if (selectedTabStr == "ONLINE_SEARCH") "새로운 책 발굴하기" else "$childNameWithJosa 서재 검색",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -172,25 +190,119 @@ fun SearchScreen(
                 }
             }
 
-            // 2. Search Text Input Field
+            // [요구사항 2] Bento 스타일의 모드 전환 탭(Tab) 레이아웃 도입
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    "MY_LIBRARY" to "🏠 내 서재 소장 도서",
+                    "ONLINE_SEARCH" to "🌐 온라인 새 책 찾기"
+                ).forEach { (tabId, label) ->
+                    val isSelected = selectedTabStr == tabId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent
+                            )
+                            .clickable { 
+                                selectedTabStr = tabId 
+                                searchQuery = ""
+                                viewModel.clearSearchResults()
+                            }
+                            .testTag("search_tab_$tabId"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // [요구사항 3] 검색 텍스트 필드(`OutlinedTextField`)에 외부 검색 액션 연동
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = { 
+                    searchQuery = it 
+                    if (it.isEmpty() && selectedTabStr == "ONLINE_SEARCH") {
+                        viewModel.clearSearchResults()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .onFocusChanged { focusState ->
+                        isSearchFieldFocused = focusState.isFocused
+                    }
                     .testTag("search_input_field"),
-                placeholder = { Text("책 제목, 저자명을 검색해보세요", fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                placeholder = { 
+                    Text(
+                        if (selectedTabStr == "ONLINE_SEARCH") "검색어 입력 후 돋보기/엔터 클릭!" 
+                        else "책 제목, 저자명을 검색해보세요", 
+                        fontSize = 14.sp
+                    ) 
+                },
+                leadingIcon = { 
+                    IconButton(
+                        onClick = {
+                            if (searchQuery.isNotBlank()) {
+                                if (selectedTabStr == "ONLINE_SEARCH") {
+                                    viewModel.performExternalSearch(searchQuery, "ALL")
+                                } else {
+                                    viewModel.addRecentSearch(searchQuery)
+                                }
+                                focusManager.clearFocus()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search, 
+                            contentDescription = "검색", 
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                        IconButton(onClick = { 
+                            searchQuery = "" 
+                            if (selectedTabStr == "ONLINE_SEARCH") {
+                                viewModel.clearSearchResults()
+                            }
+                        }) {
                             Icon(Icons.Default.Close, contentDescription = "검색어 지우기")
                         }
                     }
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (searchQuery.isNotBlank()) {
+                            if (selectedTabStr == "ONLINE_SEARCH") {
+                                viewModel.performExternalSearch(searchQuery, "ALL")
+                            } else {
+                                viewModel.addRecentSearch(searchQuery)
+                            }
+                            focusManager.clearFocus()
+                        }
+                    }
+                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
@@ -199,144 +311,95 @@ fun SearchScreen(
                 )
             )
 
-            // 3. Bento Filter Rows
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Category Filter Scrollable Row
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // 최근 검색어 Chip 리스트 표시 (포커스 시 또는 비어있지 않을 때)
+            if (isSearchFieldFocused && recentSearches.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    item {
-                        FilterChip(
-                            selected = selectedCategory == null,
-                            onClick = { selectedCategory = null },
-                            label = { Text("전체 분야", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFEADDFF),
-                                selectedLabelColor = Color(0xFF21005D)
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                    }
-                    items(Book.CATEGORIES) { cat ->
-                        FilterChip(
-                            selected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat },
-                            label = { Text(cat, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFEADDFF),
-                                selectedLabelColor = Color(0xFF21005D)
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.testTag("filter_category_$cat")
-                        )
-                    }
-                }
-
-                // Reading Status Filter Scrollable Row
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val statusList = listOf(
-                        null to "전체 상태",
-                        Book.STATUS_WANT_TO_READ to "읽고싶은",
-                        Book.STATUS_READING to "읽는 중",
-                        Book.STATUS_COMPLETED to "완독"
-                    )
-                    items(statusList) { (status, label) ->
-                        FilterChip(
-                            selected = selectedStatus == status,
-                            onClick = { selectedStatus = status },
-                            label = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFEADDFF),
-                                selectedLabelColor = Color(0xFF21005D)
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.testTag("filter_status_${status ?: "all"}")
-                        )
-                    }
-                }
-
-                // Tags filter list
-                if (allTags.isNotEmpty()) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        item {
-                            FilterChip(
-                                selected = selectedTag == null,
-                                onClick = { selectedTag = null },
-                                label = { Text("전체 태그", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFEADDFF),
-                                    selectedLabelColor = Color(0xFF21005D)
+                        Text(
+                            text = "최근 검색어",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "닫기",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.clickable { focusManager.clearFocus() }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(recentSearches) { query ->
+                            SuggestionChip(
+                                onClick = {
+                                    searchQuery = query
+                                    if (selectedTabStr == "ONLINE_SEARCH") {
+                                        viewModel.performExternalSearch(query, "ALL")
+                                    } else {
+                                        viewModel.addRecentSearch(query)
+                                    }
+                                    focusManager.clearFocus()
+                                },
+                                label = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(text = query, fontSize = 11.sp)
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "삭제",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clickable { viewModel.removeRecentSearch(query) }
+                                        )
+                                    }
+                                },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                                 ),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                        }
-                        items(allTags) { tag ->
-                            FilterChip(
-                                selected = selectedTag == tag,
-                                onClick = { selectedTag = tag },
-                                label = { Text("#$tag", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFEADDFF),
-                                    selectedLabelColor = Color(0xFF21005D)
-                                ),
-                                shape = RoundedCornerShape(16.dp)
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // 4. Search Results Grid (Header & Grid)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "검색 결과 (${filteredBooks.size}권)",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            if (filteredBooks.isEmpty()) {
+            // [요구사항 4] 로딩 애니메이션 및 결과 그리드 뷰 분기 처리
+            if (selectedTabStr == "ONLINE_SEARCH" && isSearching) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .padding(32.dp),
+                        .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.MenuBook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (books.isEmpty()) "등록된 책이 없습니다.\n독서 캘린더에서 새 책을 등록해보세요!" else "조건에 맞는 도서가 없습니다.\n다른 필터를 터치하거나 새 키워드를 입력해보세요.",
+                            text = "구글 도서 데이터베이스와 AI를 결합하여\n새로운 책을 검색하고 있는 중입니다...",
                             textAlign = TextAlign.Center,
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -345,96 +408,321 @@ fun SearchScreen(
                     }
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(filteredBooks) { book ->
-                        BookGridCard(
-                            book = book,
-                            onClick = { onNavigateToBookDetail(book.id) }
-                        )
-                    }
-                }
-            }
-
-            // 5. Fast Access Shelf
-            if (searchQuery.isEmpty() && fastAccessBooks.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "📌 최근에 연 독서 기록",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                if (selectedTabStr == "MY_LIBRARY") {
+                    // Bento Filter Rows (Only shown for MY_LIBRARY)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Category Filter Scrollable Row
                         LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            items(fastAccessBooks) { book ->
-                                Column(
-                                    modifier = Modifier
-                                        .width(76.dp)
-                                        .clickable { onNavigateToBookDetail(book.id) },
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Card(
-                                        modifier = Modifier
-                                            .size(64.dp, 84.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                                    ) {
-                                        if (!book.coverUrl.isNullOrEmpty()) {
-                                            AsyncImage(
-                                                model = book.coverUrl,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Color(0xFFEADDFF)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = book.title.take(2),
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp,
-                                                    color = Color(0xFF21005D)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = book.title,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
+                            item {
+                                FilterChip(
+                                    selected = selectedCategory == null,
+                                    onClick = { selectedCategory = null },
+                                    label = { Text("전체 분야", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFEADDFF),
+                                        selectedLabelColor = Color(0xFF21005D)
+                                    ),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            }
+                            items(Book.CATEGORIES) { cat ->
+                                FilterChip(
+                                    selected = selectedCategory == cat,
+                                    onClick = { selectedCategory = cat },
+                                    label = { Text(cat, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFEADDFF),
+                                        selectedLabelColor = Color(0xFF21005D)
+                                    ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.testTag("filter_category_$cat")
+                                )
+                            }
+                        }
+
+                        // Reading Status Filter Scrollable Row
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val statusList = listOf(
+                                null to "전체 상태",
+                                Book.STATUS_WANT_TO_READ to "읽고싶은",
+                                Book.STATUS_READING to "읽는 중",
+                                Book.STATUS_COMPLETED to "완독"
+                            )
+                            items(statusList) { (status, label) ->
+                                FilterChip(
+                                    selected = selectedStatus == status,
+                                    onClick = { selectedStatus = status },
+                                    label = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFFEADDFF),
+                                        selectedLabelColor = Color(0xFF21005D)
+                                    ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.testTag("filter_status_${status ?: "all"}")
+                                )
+                            }
+                        }
+
+                        // Tags filter list
+                        if (allTags.isNotEmpty()) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                item {
+                                    FilterChip(
+                                        selected = selectedTag == null,
+                                        onClick = { selectedTag = null },
+                                        label = { Text("전체 태그", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFFEADDFF),
+                                            selectedLabelColor = Color(0xFF21005D)
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
                                     )
                                 }
+                                items(allTags) { tag ->
+                                    FilterChip(
+                                        selected = selectedTag == tag,
+                                        onClick = { selectedTag = tag },
+                                        label = { Text("#$tag", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFFEADDFF),
+                                            selectedLabelColor = Color(0xFF21005D)
+                                        ),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Results Count Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "검색 결과 (${filteredBooks.size}권)",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (filteredBooks.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.MenuBook,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(56.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (books.isEmpty()) "등록된 책이 없습니다.\n독서 캘린더에서 새 책을 등록해보세요!" else "조건에 맞는 도서가 없습니다.\n다른 필터를 터치하거나 새 키워드를 입력해보세요.",
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(filteredBooks) { book ->
+                                BookGridCard(
+                                    book = book,
+                                    onClick = { onNavigateToBookDetail(book.id) }
+                                )
+                            }
+                        }
+                    }
+
+                    // Fast Access Shelf
+                    if (searchQuery.isEmpty() && fastAccessBooks.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "📌 최근에 연 독서 기록",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(fastAccessBooks) { book ->
+                                        Column(
+                                            modifier = Modifier
+                                                .width(76.dp)
+                                                .clickable { onNavigateToBookDetail(book.id) },
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Card(
+                                                modifier = Modifier
+                                                    .size(64.dp, 84.dp),
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                            ) {
+                                                if (!book.coverUrl.isNullOrEmpty()) {
+                                                    AsyncImage(
+                                                        model = book.coverUrl,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(Color(0xFFEADDFF)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = book.title.take(2),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp,
+                                                            color = Color(0xFF21005D)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = book.title,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // ONLINE_SEARCH mode results
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "온라인 검색 추천 (${onlineSearchResults.size}권)",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (onlineSearchResults.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(56.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "원하는 책 제목이나 저자명을 검색해 보거나,\n'7세 아이가 좋아하는 따뜻한 공룡 책' 등\n자유로운 AI 테마 추천 검색어를 입력해 보세요!",
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(onlineSearchResults) { result ->
+                                OnlineBookGridCard(
+                                    result = result,
+                                    onRegisterClick = {
+                                        // [요구사항 5] 온라인 검색 결과의 '원클릭 내 서재 등록' 트랜잭션 구현
+                                        val randomizedIsbn = if (result.isbn.isNotEmpty()) result.isbn else System.currentTimeMillis().toString()
+                                        viewModel.insertBook(
+                                            title = result.title,
+                                            author = result.author,
+                                            publisher = result.publisher.ifEmpty { "출판사 정보 없음" },
+                                            publishDate = result.publishDate.ifEmpty { "연도 미상" },
+                                            isbn = randomizedIsbn,
+                                            category = result.category.ifEmpty { "창작그림책" },
+                                            coverUrl = result.coverUrl,
+                                            status = Book.STATUS_WANT_TO_READ,
+                                            onSuccess = { insertedId ->
+                                                onNavigateToBookDetail(insertedId)
+                                            }
+                                        )
+                                    }
+                                )
                             }
                         }
                     }
@@ -547,6 +835,132 @@ fun BookGridCard(
                     labelColor = Color(0xFF21005D)
                 )
             )
+        }
+    }
+}
+
+@Composable
+fun OnlineBookGridCard(
+    result: BookSearchResult,
+    onRegisterClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onRegisterClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            // Book cover / Placeholder container
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!result.coverUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = result.coverUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.MenuBook,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // AI / Google Books label badge
+                val isAiResult = result.description.contains("AI", ignoreCase = true) || result.isbn.isEmpty()
+                val badgeLabel = if (isAiResult) "AI 추천" else "Google 도서"
+                val badgeBgColor = if (isAiResult) Color(0xFFE0F2FE) else Color(0xFFF1F5F9)
+                val badgeTextColor = if (isAiResult) Color(0xFF0369A1) else Color(0xFF475569)
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(CircleShape)
+                        .background(badgeBgColor)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeLabel,
+                        fontSize = 9.sp,
+                        color = badgeTextColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // [요구사항 5] CloudDownload 버튼 배치
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(36.dp)
+                        .shadow(4.dp, CircleShape)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .clickable { onRegisterClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = "내 서재에 저장",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = result.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = result.author,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 1.dp)
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SuggestionChip(
+                    onClick = {},
+                    label = { Text(result.category.ifEmpty { "창작그림책" }, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                    modifier = Modifier.height(22.dp),
+                    border = null,
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = Color(0xFFF3E8FF),
+                        labelColor = Color(0xFF6B21A8)
+                    )
+                )
+            }
         }
     }
 }

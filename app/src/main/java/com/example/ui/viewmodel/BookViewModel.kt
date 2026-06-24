@@ -356,6 +356,12 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putString("recent_searches", updated.joinToString("||")).apply()
     }
 
+    fun addRecentSearch(query: String) {
+        if (query.isNotBlank()) {
+            saveSearchQuery(query)
+        }
+    }
+
     fun removeRecentSearch(query: String) {
         val current = _recentSearches.value.toMutableList()
         current.remove(query)
