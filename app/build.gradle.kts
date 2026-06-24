@@ -10,16 +10,41 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
-// Load local.properties and environment variables robustly
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-  localPropertiesFile.inputStream().use { localProperties.load(it) }
-}
+// Load GEMINI_API_KEY robustly across multiple possible sources
+val geminiApiKey: String = run {
+  // 1. Try system environment variable (CI/CD or server-side injection)
+  var key = System.getenv("GEMINI_API_KEY")
+  if (!key.isNullOrBlank()) return@run key
 
-val geminiApiKey: String = System.getenv("GEMINI_API_KEY")
-  ?: localProperties.getProperty("GEMINI_API_KEY")
-  ?: ""
+  // 2. Try .env file (standard for AI Studio platform Secrets Panel)
+  val envFile = rootProject.file(".env")
+  if (envFile.exists()) {
+    val envProps = Properties()
+    envFile.inputStream().use { envProps.load(it) }
+    key = envProps.getProperty("GEMINI_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  // 3. Try local.properties file (standard local override)
+  val localPropsFile = rootProject.file("local.properties")
+  if (localPropsFile.exists()) {
+    val localProps = Properties()
+    localPropsFile.inputStream().use { localProps.load(it) }
+    key = localProps.getProperty("GEMINI_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  // 4. Try .env.example file as absolute last resort fallback
+  val envExampleFile = rootProject.file(".env.example")
+  if (envExampleFile.exists()) {
+    val envExampleProps = Properties()
+    envExampleFile.inputStream().use { envExampleProps.load(it) }
+    key = envExampleProps.getProperty("GEMINI_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  ""
+}
 
 android {
   namespace = "com.example"

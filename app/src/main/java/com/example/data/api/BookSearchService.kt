@@ -50,7 +50,14 @@ object BookSearchService {
         BookSearchResult("용선생의 시끌벅적 한국사 1", "우지현", "사회평론어린이", "2012-12", "9788964356401", "역사", "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=80&w=200", "초등 역사 최고 권위의 입체식 해설서로, 개성 넘치는 캐릭터들과 함께 역사적 배경과 인과관계를 스토리텔링으로 완벽하게 이해하게 도와줍니다."),
         BookSearchResult("Why? 과학 공룡", "허순봉", "예림당", "2009-06", "9788930231367", "과학", "https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=200", "지구 최고의 포식자였던 공룡들의 탄생과 종류, 멸종의 비밀까지 흥미로운 삽화와 탄탄한 초등 과학 교과 연계 스토리를 통해 밝혀냅니다."),
         BookSearchResult("이상한 과자 가게 전천당 1", "히로시마 레이코", "길벗스쿨", "2019-07", "9791164060894", "동화", "https://images.unsplash.com/photo-1509021436665-8f37df706533?auto=format&fit=crop&q=80&w=200", "행운을 가진 사람에게만 나타나는 신비한 과자가게 전천당의 주인이 고민을 해결해주는 마법 같은 간식을 파는 기묘하고 환상적인 판타지 시리즈입니다."),
-        BookSearchResult("어린 왕자", "생텍쥐페리", "더스토리", "2015-09", "9791158430344", "문학", "https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&q=80&w=200", "사막에 불시착한 조종사가 우주 여행을 하던 순수한 영혼의 어린 왕자를 만나 세상을 살아가는 참된 가치와 우정, 사랑을 배워가는 인류의 영원한 고전입니다.")
+        BookSearchResult("어린 왕자", "생텍쥐페리", "더스토리", "2015-09", "9791158430344", "문학", "https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&q=80&w=200", "사막에 불시착한 조종사가 우주 여행을 하던 순수한 영혼의 어린 왕자를 만나 세상을 살아가는 참된 가치와 우정, 사랑을 배워가는 인류의 영원한 고전입니다."),
+        BookSearchResult("소공녀", "프랜시스 호지슨 버넷", "계림북스", "2005-12", "9788953538425", "동화", "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=200", "부유한 특별 대우생에서 하루아침에 다락방 하녀로 전락한 세라가 고결한 품위와 따뜻한 마음을 잃지 않고 역경을 극복하는 감동 명작입니다."),
+        BookSearchResult("소공자", "프랜시스 호지슨 버넷", "웅진씽크하우스", "2007-06", "9788901067346", "동화", "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=200", "뉴욕의 가난한 소년 세드릭이 완고하고 차가운 영국의 할아버지 에를 백작을 만나, 천사 같은 순수함과 사랑으로 마음을 변화시키는 이야기입니다."),
+        BookSearchResult("비밀의 화원", "프랜시스 호지슨 버넷", "시공주니어", "2010-03", "9788952757531", "동화", "https://images.unsplash.com/photo-1541963463532-d68292c34b19?auto=format&fit=crop&q=80&w=200", "고집스럽고 외로운 소녀 메리가 버려진 비밀의 정원을 발견하고, 자연과 친구들의 사랑 속에서 몸과 마음의 건강과 행복을 되찾아가는 마법 같은 이야기입니다."),
+        BookSearchResult("해리 포터와 마법사의 돌 1", "J.K. 롤링", "문학수첩", "2019-11", "9788914022417", "동화", "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=200", "자신이 마법사임을 알게 된 해리 포터가 호그와트 마법학교에 입학하여 친구들과 함께 어둠의 마법을 마주하며 펼치는 위대한 마법 판타지의 서막입니다."),
+        BookSearchResult("백설공주", "그림 형제", "비룡소", "2011-04", "9788949110011", "동화", "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=200", "질투 많은 왕비를 피해 숲속 일곱 난쟁이들과 살아가던 백설공주가 독사과를 먹고 잠들었다가 왕자님의 진실한 사랑의 힘으로 깨어나는 세계적인 전래 동화입니다."),
+        BookSearchResult("신데렐라", "샤를 페로", "계림", "2004-03", "9788953523315", "동화", "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&q=80&w=200", "새엄마와 언니들에게 구박받던 신데렐라가 요정 대모의 마법 도움으로 무도회에 참석해 유리구두 한 짝을 남겨두고 온 뒤 왕세자비를 찾는 아름다운 로맨스 동화입니다."),
+        BookSearchResult("인어공주", "한스 크리스티안 안데르센", "비룡소", "2005-09", "9788949111452", "동화", "https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&q=80&w=200", "인간 왕자를 사랑하게 된 인어공주가 목소리를 잃는 대가를 치르고 다리를 얻어 육지로 나아가는 애절하고도 숭고한 사랑의 물거품 이야기입니다.")
     )
 
     fun getLocalFallbackResults(query: String): List<BookSearchResult> {
@@ -96,7 +103,12 @@ object BookSearchService {
         val results = mutableListOf<BookSearchResult>()
         try {
             val encodedQuery = URLEncoder.encode(query, "UTF-8")
-            val url = "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8"
+            val apiKey = BuildConfig.GEMINI_API_KEY
+            val url = if (apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY") {
+                "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8&key=$apiKey"
+            } else {
+                "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8"
+            }
             
             val request = Request.Builder()
                 .url(url)
@@ -105,14 +117,24 @@ object BookSearchService {
                 .build()
 
             client.newCall(request).execute().use { response ->
+                println("GOOGLE BOOKS RESPONSE CODE: ${response.code}")
                 Log.d(TAG, "searchGoogleBooks response code: ${response.code}")
                 if (!response.isSuccessful) {
+                    println("GOOGLE BOOKS RESPONSE FAILED: ${response.code} ${response.message}")
                     Log.e(TAG, "searchGoogleBooks failed: ${response.code} ${response.message}")
                     return@withContext emptyList()
                 }
                 val bodyString = response.body?.string() ?: return@withContext emptyList()
+                println("GOOGLE BOOKS BODY LENGTH: ${bodyString.length}")
+                if (bodyString.length < 500) {
+                    println("GOOGLE BOOKS BODY: $bodyString")
+                }
                 val json = JSONObject(bodyString)
-                val items = json.optJSONArray("items") ?: return@withContext emptyList()
+                val items = json.optJSONArray("items")
+                if (items == null) {
+                    println("GOOGLE BOOKS ITEMS IS NULL")
+                    return@withContext emptyList()
+                }
                 
                 for (i in 0 until items.length()) {
                     val item = items.getJSONObject(i)
@@ -175,7 +197,13 @@ object BookSearchService {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Google Books Search Error", e)
+            println("REAL SEARCH EXCEPTION: ${e.message}")
+            e.printStackTrace()
+            try {
+                Log.e(TAG, "Google Books Search Error", e)
+            } catch (logEx: Throwable) {
+                // Ignore log mocking exception in JUnit tests
+            }
         }
         return@withContext results
     }
@@ -195,7 +223,7 @@ object BookSearchService {
     /**
      * Search books via Gemini API for smart kids catalog resolution (Excellent for Korean Children's Books)
      */
-    suspend fun searchWithGemini(query: String): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchWithGemini(query: String, model: String = "gemini-3.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is not configured or is placeholder.")
@@ -256,17 +284,22 @@ object BookSearchService {
             }
 
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
                 .post(jsonRequest.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
             client.newCall(request).execute().use { response ->
+                println("GEMINI API RESPONSE CODE: ${response.code}")
                 if (!response.isSuccessful) {
+                    println("GEMINI API FAILED: ${response.code} ${response.message}")
                     Log.e(TAG, "Gemini API Request Failed: ${response.code} ${response.message}")
+                    val errorBody = response.body?.string()
+                    println("GEMINI API ERROR BODY: $errorBody")
                     return@withContext emptyList()
                 }
 
                 val bodyString = response.body?.string() ?: return@withContext emptyList()
+                println("GEMINI API SUCCESS BODY LENGTH: ${bodyString.length}")
                 val responseJson = JSONObject(bodyString)
                 val candidates = responseJson.optJSONArray("candidates") ?: return@withContext emptyList()
                 val contentObj = candidates.optJSONObject(0)?.optJSONObject("content") ?: return@withContext emptyList()

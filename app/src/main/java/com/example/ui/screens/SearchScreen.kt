@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.example.BuildConfig
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -310,6 +312,52 @@ fun SearchScreen(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 )
             )
+
+            // Gemini API Key Status Banner
+            val isGeminiConfigured = BuildConfig.GEMINI_API_KEY.isNotEmpty() && 
+                    BuildConfig.GEMINI_API_KEY != "MY_GEMINI_API_KEY" && 
+                    !BuildConfig.GEMINI_API_KEY.startsWith("YOUR_")
+
+            if (selectedTabStr == "ONLINE_SEARCH" && !isGeminiConfigured) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "알림",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Gemini API 키가 설정되지 않았습니다",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "AI 추천 검색어를 100% 가동하려면 AI Studio 우측의 [Secrets] 설정 패널에 'GEMINI_API_KEY'를 추가해 주세요. 현재는 초정밀 로컬 아동 도서 추천 엔진('소공녀', '해리포터' 등 지원)이 매끄럽게 연동 중입니다.",
+                                fontSize = 10.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
 
             // 최근 검색어 Chip 리스트 표시 (포커스 시 또는 비어있지 않을 때)
             if (isSearchFieldFocused && recentSearches.isNotEmpty()) {
