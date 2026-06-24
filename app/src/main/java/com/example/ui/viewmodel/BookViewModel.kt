@@ -31,6 +31,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: BookRepository
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
     private val searchCache = mutableMapOf<Pair<String, String>, List<BookSearchResult>>()
+    var lastQuery: String = ""
+    var lastSearchMode: String = "ALL"
 
     private val _childNameState = MutableStateFlow(getChildName())
     val childNameState: StateFlow<String> = _childNameState.asStateFlow()
@@ -328,11 +330,15 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         
+        lastQuery = query
+        lastSearchMode = searchMode
+        
         val cacheKey = Pair(query.trim().lowercase(), searchMode)
         val cached = searchCache[cacheKey]
         if (cached != null) {
             Log.d("BookViewModel", "Returning cached search results for query: $query, mode: $searchMode")
             _searchUiState.value = SearchUiState.Success(cached)
+            _isSearching.value = false
             return
         }
 
@@ -357,6 +363,21 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 _isSearching.value = false
             }
+        }
+    }
+
+    fun restoreSearchResults(query: String, searchMode: String = "ALL") {
+        if (query.isBlank()) {
+            _searchUiState.value = SearchUiState.Idle
+            return
+        }
+        val cacheKey = Pair(query.trim().lowercase(), searchMode)
+        val cached = searchCache[cacheKey]
+        if (cached != null) {
+            _searchUiState.value = SearchUiState.Success(cached)
+            _isSearching.value = false
+        } else {
+            _searchUiState.value = SearchUiState.Idle
         }
     }
 

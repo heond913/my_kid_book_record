@@ -406,9 +406,10 @@ object BookSearchService {
         
         if (searchMode == "AI") {
             return try {
-                searchWithGemini(query, startTime, timeoutMs)
+                // '새 책 등록하기'의 'AI 검색'은 10초 타임아웃 로직을 제거하고 60초의 넉넉한 예산을 부여
+                searchWithGemini(query, startTime = System.currentTimeMillis(), timeoutMs = 60000L)
             } catch (e: Exception) {
-                Log.e(TAG, "performUnifiedSearch: Gemini AI search failed or timed out.", e)
+                Log.e(TAG, "performUnifiedSearch: Gemini AI search failed.", e)
                 emptyList()
             }
         }

@@ -218,8 +218,15 @@ fun SearchScreen(
                             )
                             .clickable { 
                                 selectedTabStr = tabId 
-                                searchQuery = ""
-                                viewModel.clearSearchResults()
+                                if (tabId == "ONLINE_SEARCH") {
+                                    searchQuery = viewModel.lastQuery
+                                    if (searchQuery.isNotBlank()) {
+                                        viewModel.restoreSearchResults(searchQuery, viewModel.lastSearchMode)
+                                    }
+                                } else {
+                                    searchQuery = ""
+                                    viewModel.clearSearchResults()
+                                }
                             }
                             .testTag("search_tab_$tabId"),
                         contentAlignment = Alignment.Center

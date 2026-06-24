@@ -88,13 +88,18 @@ fun AddBookScreen(
                     selected = activeTab == 0,
                     onClick = { 
                         activeTab = 0 
-                        viewModel.clearSearchResults()
+                        searchQuery = viewModel.lastQuery
+                        if (searchQuery.isNotBlank()) {
+                            viewModel.restoreSearchResults(searchQuery, searchMode)
+                        }
                     },
                     text = { Text("도서 검색 등록", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = activeTab == 1,
-                    onClick = { activeTab = 1 },
+                    onClick = { 
+                        activeTab = 1
+                    },
                     text = { Text("직접 수동 입력", fontWeight = FontWeight.Bold) }
                 )
             }
