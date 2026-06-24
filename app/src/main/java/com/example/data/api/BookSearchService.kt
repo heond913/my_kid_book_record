@@ -97,18 +97,15 @@ object BookSearchService {
     }
 
     /**
-     * Search books via Google Books API
+     * Search books via Google Books API with explicit API key authentication
      */
     suspend fun searchGoogleBooks(query: String): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val results = mutableListOf<BookSearchResult>()
         try {
             val encodedQuery = URLEncoder.encode(query, "UTF-8")
             val apiKey = BuildConfig.GEMINI_API_KEY
-            val url = if (apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY") {
-                "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8&key=$apiKey"
-            } else {
-                "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8"
-            }
+            // [요구사항 2] URL 끝에 명시적으로 &key=${BuildConfig.GEMINI_API_KEY}를 주입
+            val url = "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8&key=$apiKey"
             
             val request = Request.Builder()
                 .url(url)
@@ -119,16 +116,18 @@ object BookSearchService {
             client.newCall(request).execute().use { response ->
                 println("GOOGLE BOOKS RESPONSE CODE: ${response.code}")
                 Log.d(TAG, "searchGoogleBooks response code: ${response.code}")
+                
+                // [요구사항 2] response.body?.string() 에러 바디 원문을 Log.e로 상세 출력
                 if (!response.isSuccessful) {
-                    println("GOOGLE BOOKS RESPONSE FAILED: ${response.code} ${response.message}")
-                    Log.e(TAG, "searchGoogleBooks failed: ${response.code} ${response.message}")
+                    val errorBody = response.body?.string() ?: ""
+                    println("GOOGLE BOOKS RESPONSE FAILED: ${response.code} ${response.message}, ErrorBody: $errorBody")
+                    Log.e(TAG, "searchGoogleBooks failed: Code=${response.code}, Message=${response.message}, ErrorBody=$errorBody")
                     return@withContext emptyList()
                 }
+                
                 val bodyString = response.body?.string() ?: return@withContext emptyList()
                 println("GOOGLE BOOKS BODY LENGTH: ${bodyString.length}")
-                if (bodyString.length < 500) {
-                    println("GOOGLE BOOKS BODY: $bodyString")
-                }
+                
                 val json = JSONObject(bodyString)
                 val items = json.optJSONArray("items")
                 if (items == null) {
@@ -197,7 +196,7 @@ object BookSearchService {
                 }
             }
         } catch (e: Exception) {
-            println("REAL SEARCH EXCEPTION: ${e.message}")
+            println("REAL GOOGLE SEARCH EXCEPTION: ${e.message}")
             e.printStackTrace()
             try {
                 Log.e(TAG, "Google Books Search Error", e)
@@ -221,9 +220,10 @@ object BookSearchService {
     }
 
     /**
-     * Search books via Gemini API for smart kids catalog resolution (Excellent for Korean Children's Books)
+     * Search books via Gemini API for smart kids catalog resolution.
+     * [요구사항 3] 모델명을 상용 경량 모델인 gemini-1.5-flash로 정정하고 투명한 에러 핸들링을 제공합니다.
      */
-    suspend fun searchWithGemini(query: String, model: String = "gemini-3.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchWithGemini(query: String, model: String = "gemini-1.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is not configured or is placeholder.")
@@ -290,11 +290,12 @@ object BookSearchService {
 
             client.newCall(request).execute().use { response ->
                 println("GEMINI API RESPONSE CODE: ${response.code}")
+                
+                // [요구사항 3] 통신 실패 시 response.body?.string() 에러 바디 원문을 투명하게 로그에 기록
                 if (!response.isSuccessful) {
-                    println("GEMINI API FAILED: ${response.code} ${response.message}")
-                    Log.e(TAG, "Gemini API Request Failed: ${response.code} ${response.message}")
-                    val errorBody = response.body?.string()
-                    println("GEMINI API ERROR BODY: $errorBody")
+                    val errorBody = response.body?.string() ?: ""
+                    println("GEMINI API FAILED: ${response.code} ${response.message}, ErrorBody: $errorBody")
+                    Log.e(TAG, "Gemini API Request Failed: Code=${response.code}, Message=${response.message}, ErrorBody=$errorBody")
                     return@withContext emptyList()
                 }
 
@@ -336,8 +337,46 @@ object BookSearchService {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Gemini Catalog Search Error", e)
+            try {
+                Log.e(TAG, "Gemini Catalog Search Error", e)
+            } catch (logEx: Throwable) {
+                // Ignore log mocking exception in JUnit tests
+            }
         }
         return@withContext results
+    }
+
+    /**
+     * [요구사항 4] 통합 검색 및 에러 자동 폴백(Fallback) 파이프라인 함수
+     * 1차적으로 Google Books API 검색을 수행하고, 결과가 없거나 실패할 경우
+     * 백그라운드에서 즉시 Gemini AI 문맥 검색을 수행하여 결과를 복구(Fallback)하며,
+     * 최후에는 로컬 정적 데이터셋 검색 결과를 안전장치로 제공합니다.
+     */
+    suspend fun performUnifiedSearch(query: String, searchMode: String = "ALL"): List<BookSearchResult> {
+        Log.d(TAG, "performUnifiedSearch query: $query, mode: $searchMode")
+        
+        // AI 모드가 명시되어 있다면 바로 Gemini 사용
+        if (searchMode == "AI") {
+            return searchWithGemini(query)
+        }
+        
+        // 1. Google Books API 검색 시도
+        val googleResults = searchGoogleBooks(query)
+        if (googleResults.isNotEmpty()) {
+            Log.d(TAG, "performUnifiedSearch: Successfully retrieved ${googleResults.size} results from Google Books API.")
+            return googleResults
+        }
+        
+        // 2. 실패 혹은 결과가 0개인 경우 -> Gemini AI 검색으로 즉시 Fallback
+        Log.w(TAG, "performUnifiedSearch: Google Books returned empty or failed. Triggering fallback to Gemini AI...")
+        val geminiResults = searchWithGemini(query)
+        if (geminiResults.isNotEmpty()) {
+            Log.d(TAG, "performUnifiedSearch: Recovered ${geminiResults.size} results via Gemini AI Fallback.")
+            return geminiResults
+        }
+        
+        // 3. 둘 다 없거나 통신 장애 시 최후의 보루인 로컬 데이터셋으로 Fallback
+        Log.w(TAG, "performUnifiedSearch: Both APIs failed or returned empty. Falling back to Local Fallback Dataset.")
+        return getLocalFallbackResults(query)
     }
 }

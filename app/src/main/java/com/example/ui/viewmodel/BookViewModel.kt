@@ -311,25 +311,13 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                val googleResults = BookSearchService.searchGoogleBooks(query)
-                val geminiResults = if (searchMode == "AI" || googleResults.isEmpty()) {
-                    BookSearchService.searchWithGemini(query)
-                } else {
-                    emptyList()
-                }
-
-                // Merge lists nicely, deduplicating by title/author
-                val merged = (googleResults + geminiResults).distinctBy { 
-                    it.title.lowercase().trim() + it.author.lowercase().trim() 
-                }
-
-                if (merged.isEmpty()) {
-                    _searchResults.value = BookSearchService.getLocalFallbackResults(query)
-                } else {
-                    _searchResults.value = merged
-                }
+                // [요구사항 4] 통합 검색 및 에러 자동 폴백(Fallback) 단일 진입점 파이프라인 호출
+                val unifiedResults = BookSearchService.performUnifiedSearch(query, searchMode)
+                _searchResults.value = unifiedResults
             } catch (e: Exception) {
                 Log.e("BookViewModel", "Search failure", e)
+                // 예외 발생 시 최종 안전장치로 로컬 검색 결과 폴백 적용
+                _searchResults.value = BookSearchService.getLocalFallbackResults(query)
             } finally {
                 _isSearching.value = false
             }
