@@ -79,7 +79,7 @@ object BookSearchService {
             val encodedQuery = URLEncoder.encode(query, "UTF-8")
             val apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY
             // [요구사항 1] 구글 북스 API 키/권한 분리
-            val url = "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=8&key=$apiKey"
+            val url = "https://www.googleapis.com/books/v1/volumes?q=$encodedQuery&maxResults=30&key=$apiKey"
             
             val request = Request.Builder()
                 .url(url)
@@ -209,7 +209,7 @@ object BookSearchService {
 
         val systemInstruction = """
             당신은 어린이 도서 추천 및 카탈로그 관리 전문가입니다. 
-            사용자가 도서 검색어(제목, 저자, 출판사, 키워드, ISBN 등)를 입력하면 해당 도서와 가장 연관성 높은 실제 한국어/글로벌 어린이 도서(유아~초등 고학년 대상) 정보를 최대 5개 검색하여 구조화된 JSON 배열로 반환해야 합니다.
+            사용자가 도서 검색어(제목, 저자, 출판사, 키워드, ISBN 등)를 입력하면 해당 도서와 가장 연관성 높은 실제 한국어/글로벌 어린이 도서(유아~초등 고학년 대상) 정보를 최대 15개 검색하여 구조화된 JSON 배열로 반환해야 합니다.
             
             중요 규칙:
             1. 카테고리는 반드시 다음 5개 항목 중 하나로 엄격하게 할당해야 합니다: "동화", "과학", "역사", "문학", "기타".
@@ -219,7 +219,7 @@ object BookSearchService {
         val prompt = """
             사용자 검색어: "$query"
             
-            위 검색어에 부합하는 도서 2~3개 정보를 아래 JSON 스키마에 맞게 응답해줘.
+            위 검색어에 부합하는 도서 정보를 최대 15개 정도 아래 JSON 스키마에 맞게 응답해줘.
             스팩에 없는 내용은 상상하지 말고 최대한 실제 정보에 기반해 채워줘.
             
             [
@@ -380,22 +380,44 @@ object BookSearchService {
             Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback pipeline.", e)
             emptyList()
         }
-        if (googleResults.isNotEmpty()) {
-            Log.d(TAG, "performUnifiedSearch: Successfully retrieved ${googleResults.size} results from Google Books API.")
-            return googleResults
+        
+        // 2. 만약 결과가 30개 미만이면, Google Books 결과와 Gemini AI 결과를 결합하여 최대 30개에 수렴시킴
+        val combinedResults = mutableListOf<BookSearchResult>()
+        combinedResults.addAll(googleResults)
+        
+        if (combinedResults.size < 30) {
+            Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini AI to supplement.")
+            val geminiResults = try {
+                searchWithGemini(query)
+            } catch (e: Exception) {
+                Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed.", e)
+                emptyList()
+            }
+            
+            val processedTitles = combinedResults.map { it.title.trim().lowercase() }.toMutableSet()
+            val processedIsbns = combinedResults.map { it.isbn.trim() }.filter { it.isNotEmpty() }.toMutableSet()
+            
+            for (book in geminiResults) {
+                if (combinedResults.size >= 30) break
+                val titleKey = book.title.trim().lowercase()
+                val isbnKey = book.isbn.trim()
+                
+                val isDuplicateTitle = processedTitles.contains(titleKey)
+                val isDuplicateIsbn = isbnKey.isNotEmpty() && processedIsbns.contains(isbnKey)
+                
+                if (!isDuplicateTitle && !isDuplicateIsbn) {
+                    combinedResults.add(book)
+                    processedTitles.add(titleKey)
+                    if (isbnKey.isNotEmpty()) {
+                        processedIsbns.add(isbnKey)
+                    }
+                }
+            }
         }
         
-        // 2. 실패 혹은 결과가 0개인 경우 -> Gemini AI 검색으로 즉시 Fallback
-        Log.w(TAG, "performUnifiedSearch: Google Books returned empty or failed. Triggering fallback to Gemini AI...")
-        val geminiResults = try {
-            searchWithGemini(query)
-        } catch (e: Exception) {
-            Log.e(TAG, "performUnifiedSearch: Gemini fallback search failed.", e)
-            emptyList()
-        }
-        if (geminiResults.isNotEmpty()) {
-            Log.d(TAG, "performUnifiedSearch: Recovered ${geminiResults.size} results via Gemini AI Fallback.")
-            return geminiResults
+        if (combinedResults.isNotEmpty()) {
+            Log.d(TAG, "performUnifiedSearch: Returning ${combinedResults.size} combined results.")
+            return combinedResults.take(30)
         }
         
         // 3. 둘 다 없거나 통신 장애 시 최후의 보루인 로컬 데이터셋으로 Fallback
