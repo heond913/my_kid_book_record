@@ -23,7 +23,7 @@ sealed interface SearchUiState {
     object Idle : SearchUiState
     object Loading : SearchUiState
     data class Success(val results: List<BookSearchResult>) : SearchUiState
-    data class Error(val message: String) : SearchUiState
+    data class Error(val exceptionMessage: String) : SearchUiState
     object Empty : SearchUiState
 }
 

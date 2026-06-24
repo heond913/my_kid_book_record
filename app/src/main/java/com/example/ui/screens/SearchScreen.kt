@@ -826,7 +826,7 @@ fun SearchScreen(
                                         )
                                         Spacer(modifier = Modifier.height(6.dp))
                                         Text(
-                                            text = state.message,
+                                            text = state.exceptionMessage,
                                             textAlign = TextAlign.Center,
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
