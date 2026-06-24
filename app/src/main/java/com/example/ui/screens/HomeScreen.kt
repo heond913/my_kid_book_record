@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -123,17 +126,17 @@ fun HomeScreen(
                     }
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFEADDFF))
-                            .border(2.dp, Color(0xFFD0BCFF), CircleShape),
+                            .size(56.dp)
+                            .shadow(elevation = 6.dp, shape = CircleShape)
+                            .background(Color(0xFFFFF59D), CircleShape) // Warm creamy yellow background
+                            .border(2.dp, Color(0xFF8B5CF6).copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "SJ",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF21005D)
+                        Icon(
+                            imageVector = Icons.Default.ChildCare,
+                            contentDescription = "아이 프로필",
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -277,35 +280,57 @@ fun HomeScreen(
                             .height(115.dp),
                         shape = RoundedCornerShape(28.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFE8DEF8)
+                            containerColor = Color(0xFFFFF9C4) // Warm light yellow container
                         )
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "이번 달 완독",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF21005D)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Warm Book background illustration
+                            Icon(
+                                imageVector = Icons.Default.Book,
+                                contentDescription = null,
+                                tint = Color(0xFF8B5CF6).copy(alpha = 0.08f),
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 10.dp, y = 10.dp)
                             )
-                            Column {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 Text(
-                                    text = "${stats.booksReadCount}권",
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color(0xFF6750A4),
-                                    lineHeight = 36.sp
+                                    text = "이번 달 완독",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF44403C)
                                 )
-                                Text(
-                                    text = if (stats.booksReadCount > 0) "목표 대비 +${stats.booksReadCount}권" else "새 도전을 시작해보세요",
-                                    fontSize = 10.sp,
-                                    color = Color(0xFF49454F),
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Column {
+                                    if (stats.booksReadCount == 0) {
+                                        Text(
+                                            text = "아이와 함께 채워갈 첫 페이지",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF8B5CF6),
+                                            lineHeight = 16.sp
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "${stats.booksReadCount}권",
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFF8B5CF6),
+                                            lineHeight = 36.sp
+                                        )
+                                        Text(
+                                            text = "목표 대비 +${stats.booksReadCount}권",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF44403C),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -519,13 +544,35 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Book,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .shadow(4.dp, CircleShape)
+                                    .background(Color(0xFFFFF9C4), CircleShape), // Soft warm yellow background
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Book,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8B5CF6), // Warm purple book icon
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .background(Color(0xFF8B5CF6), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFD600),
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "오늘 읽은 책 기록이 없어요.\n자녀와 함께 책을 읽고 첫 기록을 남겨보세요!",
                                 textAlign = TextAlign.Center,
@@ -574,21 +621,20 @@ fun CalendarDayCell(
     }
 
     val cellBackground = when {
-        isSelected -> Color(0xFFEADDFF)
-        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-        sessions.isNotEmpty() -> Color(0xFFF3EDF7)
-        else -> Color(0xFFFBF8FD)
+        isSelected -> Color(0xFFFFD600).copy(alpha = 0.15f) // Warm yellow accent for selected
+        isToday -> Color(0xFFFFD600).copy(alpha = 0.1f) // Soft warm highlight for today
+        else -> Color.Transparent
     }
 
     val borderStroke = when {
-        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        isToday -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
-        sessions.isNotEmpty() -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-        else -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        isSelected -> BorderStroke(2.dp, Color(0xFF8B5CF6)) // Warm purple border for selection
+        isToday -> BorderStroke(1.5.dp, Color(0xFFFFD600)) // Warm yellow border for today
+        sessions.isNotEmpty() -> BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f))
+        else -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
     }
 
     val textColor = when {
-        isSelected -> Color(0xFF21005D)
+        isSelected -> Color(0xFF8B5CF6) // Highlight selected with warm purple
         else -> baseTextColor
     }
 
@@ -603,10 +649,10 @@ fun CalendarDayCell(
         border = borderStroke,
         elevation = CardDefaults.cardElevation(
             defaultElevation = when {
-                isSelected -> 4.dp
-                sessions.isNotEmpty() -> 2.dp
-                isToday -> 3.dp
-                else -> 0.5.dp
+                isSelected -> 3.dp
+                sessions.isNotEmpty() -> 1.5.dp
+                isToday -> 2.dp
+                else -> 0.dp
             }
         ),
         onClick = onClick
@@ -615,73 +661,52 @@ fun CalendarDayCell(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            // Book cover as background with Opacity 0.3 if reading session exists
             if (sessions.isNotEmpty()) {
-                Icon(
-                    imageVector = Icons.Default.Book,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
-                    modifier = Modifier
-                        .size(36.dp)
-                        .align(Alignment.Center)
-                )
+                val book = books.find { it.id == sessions.first().bookId }
+                if (book != null && !book.coverUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = book.coverUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(0.3f),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF8B5CF6).copy(alpha = 0.1f))
+                    )
+                }
             }
 
+            // Day content
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = dayOfMonth.toString(),
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected || isToday || sessions.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
-                        color = textColor,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = dayOfMonth.toString(),
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected || isToday || sessions.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                    color = textColor,
+                    textAlign = TextAlign.Center
+                )
 
                 if (sessions.isNotEmpty()) {
-                    val book = books.find { it.id == sessions.first().bookId }
-                    if (book != null) {
-                        if (!book.coverUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = book.coverUrl,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(width = 16.dp, height = 22.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .border(0.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(3.dp)),
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                            )
-                        } else {
-                            Text(
-                                text = book.title.take(1),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color(0xFF6750A4),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .background(Color(0xFFEADDFF), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF6750A4))
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
+                    // Tiny elegant purple reading dot
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF8B5CF6))
+                    )
                 }
             }
         }

@@ -26,13 +26,13 @@ val BentoOnTertiary = Color(0xFFFFFFFF)
 val BentoTertiaryContainer = Color(0xFFFFD8E4)
 val BentoOnTertiaryContainer = Color(0xFF31111D)
 
-val BentoBackground = Color(0xFFFFFFFF) // Pure White Background
-val BentoOnBackground = Color(0xFF1C1B1F)
+val BentoBackground = Color(0xFFFDFCF0) // Eye-comfortable Cream Background
+val BentoOnBackground = Color(0xFF44403C) // Dark Brown text
 
-val BentoSurface = Color(0xFFFFFFFF) // Pure White Surface
-val BentoOnSurface = Color(0xFF1C1B1F)
-val BentoSurfaceVariant = Color(0xFFF5F5F5) // Clean very light gray
-val BentoOnSurfaceVariant = Color(0xFF49454F)
+val BentoSurface = Color(0xFFFDFCF0) // Cream Surface
+val BentoOnSurface = Color(0xFF44403C)
+val BentoSurfaceVariant = Color(0xFFF5F2EB) // Slightly darker cream for contrast
+val BentoOnSurfaceVariant = Color(0xFF44403C)
 
 val BentoOutline = Color(0xFFCAC4D0)
 val BentoOutlineVariant = Color(0xFFE7E0EC)

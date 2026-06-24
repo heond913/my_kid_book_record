@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
@@ -90,17 +92,17 @@ fun ReportScreen(viewModel: BookViewModel) {
                     }
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFEADDFF))
-                            .border(2.dp, Color(0xFFD0BCFF), CircleShape),
+                            .size(56.dp)
+                            .shadow(elevation = 6.dp, shape = CircleShape)
+                            .background(Color(0xFFFFF59D), CircleShape) // Warm creamy yellow background
+                            .border(2.dp, Color(0xFF8B5CF6).copy(alpha = 0.5f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "SJ",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF21005D)
+                        Icon(
+                            imageVector = Icons.Default.ChildCare,
+                            contentDescription = "아이 프로필",
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }

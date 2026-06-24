@@ -13,10 +13,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ChildCare
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,17 +97,17 @@ fun GoalScreen(viewModel: BookViewModel) {
                 }
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFEADDFF))
-                        .border(2.dp, Color(0xFFD0BCFF), CircleShape),
+                        .size(56.dp)
+                        .shadow(elevation = 6.dp, shape = CircleShape)
+                        .background(Color(0xFFFFF59D), CircleShape) // Warm creamy yellow background
+                        .border(2.dp, Color(0xFF8B5CF6).copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "SJ",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF21005D)
+                    Icon(
+                        imageVector = Icons.Default.ChildCare,
+                        contentDescription = "아이 프로필",
+                        tint = Color(0xFF8B5CF6),
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
@@ -214,9 +220,9 @@ fun GoalScreen(viewModel: BookViewModel) {
                 )
             }
 
-            // --- Create Goal Dialog ---
+            // --- Create Goal Bottom Sheet ---
             if (showCreateGoalDialog) {
-                CreateGoalDialog(
+                CreateGoalBottomSheet(
                     onDismiss = { showCreateGoalDialog = false },
                     onSubmit = { type, value, count ->
                         viewModel.setReadingGoal(type, value, count)
@@ -347,13 +353,14 @@ fun GoalProgressCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateGoalDialog(
+fun CreateGoalBottomSheet(
     onDismiss: () -> Unit,
     onSubmit: (type: String, value: String, count: Int) -> Unit
 ) {
     var periodType by remember { mutableStateOf("MONTHLY") } // "MONTHLY", "QUARTERLY", "YEARLY"
-    var targetCount by remember { mutableStateOf("5") }
+    var targetCountInt by remember { mutableStateOf(5) }
 
     val cal = Calendar.getInstance()
     val currentYear = cal.get(Calendar.YEAR)
@@ -363,36 +370,87 @@ fun CreateGoalDialog(
     var selectedMonth by remember { mutableStateOf(String.format("%02d", currentMonth)) }
     var selectedQuarter by remember { mutableStateOf("Q1") }
 
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = {
-                    val countInt = targetCount.toIntOrNull() ?: 5
-                    val periodValue = when (periodType) {
-                        "MONTHLY" -> "$selectedYear-$selectedMonth"
-                        "QUARTERLY" -> "$selectedYear-$selectedQuarter"
-                        else -> selectedYear
-                    }
-                    onSubmit(periodType, periodValue, countInt)
-                },
-                modifier = Modifier.testTag("submit_goal_button")
+        sheetState = sheetState,
+        containerColor = Color(0xFFFDFCF0), // Match cream background perfectly!
+        contentColor = Color(0xFF44403C)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp, top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "독서 습관 목표 추가",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                color = Color(0xFF44403C),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Dynamic interactive book stack illustration (visual "책이 쌓이는 시각적 효과")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             ) {
-                Text("목표 설정")
+                Box(
+                    modifier = Modifier.height(110.dp).fillMaxWidth(),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    val displayCount = targetCountInt.coerceIn(1, 10)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy((-4).dp)
+                    ) {
+                        for (i in 0 until displayCount) {
+                            val bookColors = listOf(
+                                Color(0xFF8B5CF6), // Warm purple
+                                Color(0xFFFFD600), // Yellow
+                                Color(0xFF4CAF50), // Green
+                                Color(0xFFEF5350), // Red
+                                Color(0xFF29B6F6)  // Blue
+                            )
+                            val bookColor = bookColors[i % bookColors.size]
+                            
+                            Card(
+                                shape = RoundedCornerShape(4.dp),
+                                colors = CardDefaults.cardColors(containerColor = bookColor),
+                                border = BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.15f)),
+                                modifier = Modifier
+                                    .width((60 + (i * 3.5)).dp)
+                                    .height(10.dp)
+                            ) {}
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "책 ${targetCountInt}권 쌓기 습관 기르기 📚",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8B5CF6)
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소")
-            }
-        },
-        title = { Text("독서 습관 목표 추가", fontWeight = FontWeight.Bold) },
-        text = {
+
+            HorizontalDivider(color = Color(0xFF44403C).copy(alpha = 0.1f))
+
+            // 1. Goal Period Segmented Chips
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("목표 주기 구분", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "목표 주기 구분",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF44403C)
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -401,47 +459,197 @@ fun CreateGoalDialog(
                     GoalTypeChip("분기 목표", periodType == "QUARTERLY", modifier = Modifier.weight(1f)) { periodType = "QUARTERLY" }
                     GoalTypeChip("연간 목표", periodType == "YEARLY", modifier = Modifier.weight(1f)) { periodType = "YEARLY" }
                 }
+            }
 
-                // Year selector
-                OutlinedTextField(
-                    value = selectedYear,
-                    onValueChange = { selectedYear = it },
-                    label = { Text("목표 기준 년도 (YYYY)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+            // 2. Year Selector (Horizontal scrollable chips)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "목표 기준 년도 선택",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF44403C)
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val years = listOf((currentYear - 1).toString(), currentYear.toString(), (currentYear + 1).toString())
+                    years.forEach { y ->
+                        FilterChip(
+                            selected = selectedYear == y,
+                            onClick = { selectedYear = y },
+                            label = { Text(text = "${y}년") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF8B5CF6),
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
 
-                if (periodType == "MONTHLY") {
-                    OutlinedTextField(
-                        value = selectedMonth,
-                        onValueChange = { selectedMonth = it },
-                        label = { Text("목표 기준 월 (MM)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+            // 3. Month or Quarter selection (Horizontal scrollable chips)
+            if (periodType == "MONTHLY") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "목표 기준 월 선택",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF44403C)
                     )
-                } else if (periodType == "QUARTERLY") {
-                    Text("목표 분기 선택", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("Q1", "Q2", "Q3", "Q4").forEach { q ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        (1..12).forEach { m ->
+                            val mStr = String.format("%02d", m)
                             FilterChip(
-                                selected = selectedQuarter == q,
-                                onClick = { selectedQuarter = q },
-                                label = { Text(q) }
+                                selected = selectedMonth == mStr,
+                                onClick = { selectedMonth = mStr },
+                                label = { Text(text = "${m}월") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF8B5CF6),
+                                    selectedLabelColor = Color.White
+                                )
                             )
                         }
                     }
                 }
+            } else if (periodType == "QUARTERLY") {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "목표 분기 선택",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF44403C)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Q1", "Q2", "Q3", "Q4").forEach { q ->
+                            FilterChip(
+                                selected = selectedQuarter == q,
+                                onClick = { selectedQuarter = q },
+                                label = { Text(text = q) },
+                                modifier = Modifier.weight(1f),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF8B5CF6),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+            }
 
-                OutlinedTextField(
-                    value = targetCount,
-                    onValueChange = { targetCount = it },
-                    label = { Text("완독 목표 권 수") },
-                    modifier = Modifier.fillMaxWidth().testTag("goal_count_input"),
-                    singleLine = true
+            // 4. Stepper for Book Count
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "완독 목표 권 수",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF44403C),
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { if (targetCountInt > 1) targetCountInt-- },
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Color(0xFFFFF9C4), CircleShape) // Light yellow round stepper
+                            .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = "줄이기",
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "${targetCountInt}권",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF44403C),
+                        modifier = Modifier
+                            .padding(horizontal = 32.dp)
+                            .testTag("goal_count_input"),
+                        textAlign = TextAlign.Center
+                    )
+
+                    IconButton(
+                        onClick = { if (targetCountInt < 99) targetCountInt++ },
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(Color(0xFFFFF9C4), CircleShape)
+                            .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "늘리기",
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    val periodValue = when (periodType) {
+                        "MONTHLY" -> "$selectedYear-$selectedMonth"
+                        "QUARTERLY" -> "$selectedYear-$selectedQuarter"
+                        else -> selectedYear
+                    }
+                    onSubmit(periodType, periodValue, targetCountInt)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .testTag("submit_goal_button"),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF8B5CF6), // Warm purple
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Text(
+                    text = "목표 설정 완료",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
                 )
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -453,17 +661,18 @@ fun GoalTypeChip(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) Color(0xFF8B5CF6) else Color(0xFFFFF9C4)) // Purple selection vs Warm light yellow background
+            .border(1.dp, if (isSelected) Color(0xFF8B5CF6) else Color(0xFF8B5CF6).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isSelected) Color.White else Color(0xFF44403C)
         )
     }
 }
