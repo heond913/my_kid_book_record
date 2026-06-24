@@ -46,6 +46,45 @@ val geminiApiKey: String = run {
   ""
 }
 
+// Load GOOGLE_BOOKS_API_KEY robustly
+val googleBooksApiKey: String = run {
+  // 1. Try system environment variable
+  var key = System.getenv("GOOGLE_BOOKS_API_KEY")
+  if (!key.isNullOrBlank()) return@run key
+
+  // 2. Try .env file
+  val envFile = rootProject.file(".env")
+  if (envFile.exists()) {
+    val envProps = Properties()
+    envFile.inputStream().use { envProps.load(it) }
+    key = envProps.getProperty("GOOGLE_BOOKS_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  // 3. Try local.properties file
+  val localPropsFile = rootProject.file("local.properties")
+  if (localPropsFile.exists()) {
+    val localProps = Properties()
+    localPropsFile.inputStream().use { localProps.load(it) }
+    key = localProps.getProperty("GOOGLE_BOOKS_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  // 4. Try .env.example
+  val envExampleFile = rootProject.file(".env.example")
+  if (envExampleFile.exists()) {
+    val envExampleProps = Properties()
+    envExampleFile.inputStream().use { envExampleProps.load(it) }
+    key = envExampleProps.getProperty("GOOGLE_BOOKS_API_KEY")
+    if (!key.isNullOrBlank()) return@run key
+  }
+
+  // 5. Fallback to geminiApiKey
+  if (geminiApiKey.isNotEmpty()) return@run geminiApiKey
+
+  ""
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -61,6 +100,7 @@ android {
 
     // [요구사항 1] defaultConfig 내부에 GEMINI_API_KEY buildConfigField 추가
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+    buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"$googleBooksApiKey\"")
   }
 
   signingConfigs {
@@ -127,6 +167,7 @@ secrets {
   defaultPropertiesFileName = ".env.example"
   // Ignore GEMINI_API_KEY to prevent duplicate field generation
   ignoreList.add("GEMINI_API_KEY")
+  ignoreList.add("GOOGLE_BOOKS_API_KEY")
 }
 
 // Some unused dependencies are commented out below instead of being removed.
