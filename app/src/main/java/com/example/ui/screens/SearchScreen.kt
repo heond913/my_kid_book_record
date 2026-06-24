@@ -59,6 +59,7 @@ fun SearchScreen(
     val recentSearches by viewModel.recentSearches.collectAsState()
 
     // [요구사항 1] 외부 검색 및 로딩 상태 스트림 구독
+    val searchUiState by viewModel.searchUiState.collectAsState()
     val onlineSearchResults by viewModel.searchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
 
@@ -700,77 +701,190 @@ fun SearchScreen(
                     }
                 } else {
                     // ONLINE_SEARCH mode results
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "온라인 검색 추천 (${onlineSearchResults.size}권)",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    if (onlineSearchResults.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(56.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "원하는 책 제목이나 저자명을 검색해 보거나,\n'7세 아이가 좋아하는 따뜻한 공룡 책' 등\n자유로운 AI 테마 추천 검색어를 입력해 보세요!",
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 18.sp
-                                )
+                    // [단계 2] SearchScreen.kt 내 컴포저블 상태 분기 리팩토링
+                    when (val state = searchUiState) {
+                        is com.example.ui.viewmodel.SearchUiState.Idle -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "원하는 책 제목이나 저자명을 검색해 보거나,\n'7세 아이가 좋아하는 따뜻한 공룡 책' 등\n자유로운 AI 테마 추천 검색어를 입력해 보세요!",
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 18.sp
+                                    )
+                                }
                             }
                         }
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(2),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentPadding = PaddingValues(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(onlineSearchResults) { result ->
-                                OnlineBookGridCard(
-                                    result = result,
-                                    onRegisterClick = {
-                                        // [요구사항 5] 온라인 검색 결과의 '원클릭 내 서재 등록' 트랜잭션 구현
-                                        val randomizedIsbn = if (result.isbn.isNotEmpty()) result.isbn else System.currentTimeMillis().toString()
-                                        viewModel.insertBook(
-                                            title = result.title,
-                                            author = result.author,
-                                            publisher = result.publisher.ifEmpty { "출판사 정보 없음" },
-                                            publishDate = result.publishDate.ifEmpty { "연도 미상" },
-                                            isbn = randomizedIsbn,
-                                            category = result.category.ifEmpty { "창작그림책" },
-                                            coverUrl = result.coverUrl,
-                                            status = Book.STATUS_WANT_TO_READ,
-                                            onSuccess = { insertedId ->
-                                                onNavigateToBookDetail(insertedId)
+                        is com.example.ui.viewmodel.SearchUiState.Loading -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        strokeWidth = 3.dp,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "AI와 구글 북스가 맞춤 도서를 탐색하는 중...",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "잠시만 기다려 주세요.",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        is com.example.ui.viewmodel.SearchUiState.Empty -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "검색 결과가 없습니다.",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "검색어를 보다 정확히 입력해 보시거나,\n다른 키워드로 검색을 시도해 보세요.",
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        lineHeight = 16.sp
+                                    )
+                                }
+                            }
+                        }
+                        is com.example.ui.viewmodel.SearchUiState.Error -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Error Icon",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = "도서 검색 중 오류가 발생했습니다.",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = state.message,
+                                            textAlign = TextAlign.Center,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        is com.example.ui.viewmodel.SearchUiState.Success -> {
+                            val results = state.results
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "온라인 검색 추천 (${results.size}권)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(2),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentPadding = PaddingValues(16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(results) { result ->
+                                        OnlineBookGridCard(
+                                            result = result,
+                                            onRegisterClick = {
+                                                // [요구사항 3] 가짜 ISBN 오염 방지: 빈 문자열 ""로 안전하게 저장
+                                                val safeIsbn = result.isbn
+                                                viewModel.insertBook(
+                                                    title = result.title,
+                                                    author = result.author,
+                                                    publisher = result.publisher.ifEmpty { "출판사 정보 없음" },
+                                                    publishDate = result.publishDate.ifEmpty { "연도 미상" },
+                                                    isbn = safeIsbn,
+                                                    category = result.category.ifEmpty { "창작그림책" },
+                                                    coverUrl = result.coverUrl,
+                                                    status = Book.STATUS_WANT_TO_READ,
+                                                    onSuccess = { insertedId ->
+                                                        onNavigateToBookDetail(insertedId)
+                                                    }
+                                                )
                                             }
                                         )
                                     }
-                                )
+                                }
                             }
                         }
                     }

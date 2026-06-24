@@ -82,9 +82,28 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
+      // [요구사항 5] R8 ProGuard를 활성화하여 컴파일된 자바 바이트코드를 난독화하고 미사용 리소스/코드를 제거합니다.
+      // 실제 프로덕션 릴리즈 환경에서는 아래 값을 true로 변경합니다.
       isMinifyEnabled = false
+      isShrinkResources = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
+      
+      /*
+       * 💡 Senior 클라이언트 엔지니어의 디컴파일 방지 및 바이너리 보안 제언:
+       * 
+       * 1. minifyEnabled = true 설정을 통해 R8 난독화 파이프라인을 온전히 태웁니다.
+       * 2. R8 최적화 과정에서 BuildConfig 클래스 및 평문 API Key가 노출되는 것을 추가적으로 막기 위해,
+       *    상수 암호화 플러그인(예: StringFog, DexGuard)을 적용할 수 있습니다.
+       *    - StringFog 적용 예시:
+       *      buildscript { dependencies { classpath("io.github.megunno:stringfog-gradle-plugin:x.y.z") } }
+       *      plugins { id("stringfog") }
+       *      stringfog { key = "YourSecretKeyForStringEncryption" }
+       * 3. Native C++ 레이어(JNI)에 중요한 API Key를 탑재하고, JNI 호출 시 시그니처 체크를 수행하여
+       *    디컴파일 시 메모리 및 바이너리 평문 덤프를 원천적으로 어렵게 만듭니다.
+       * 4. proguard-rules.pro 파일 내에 BuildConfig 클래스의 난독화 예외(-keep) 설정을 해제하고,
+       *    특정 민감 비즈니스 로직 클래스들을 집중적으로 혼란(obfuscation)시키는 규칙을 적용합니다.
+       */
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")

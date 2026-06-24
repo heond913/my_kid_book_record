@@ -17,6 +17,16 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+// [요구사항 2] 상태 패러다임 전환 (Sealed Class 도입)
+// 로딩, 성공, 에러, 결과 없음 상태를 정밀하게 표현하는 검색 상태 머신 정의
+sealed interface SearchUiState {
+    object Idle : SearchUiState
+    object Loading : SearchUiState
+    data class Success(val results: List<BookSearchResult>) : SearchUiState
+    data class Error(val message: String) : SearchUiState
+    object Empty : SearchUiState
+}
+
 class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: BookRepository
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
@@ -73,8 +83,18 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Search States ---
-    private val _searchResults = MutableStateFlow<List<BookSearchResult>>(emptyList())
-    val searchResults: StateFlow<List<BookSearchResult>> = _searchResults.asStateFlow()
+    private val _searchUiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
+    val searchUiState: StateFlow<SearchUiState> = _searchUiState.asStateFlow()
+
+    // 하위 호환성 유지를 위해 searchUiState로부터 성공 결과 리스트를 추출하는 파생 흐름 정의
+    val searchResults: StateFlow<List<BookSearchResult>> = _searchUiState
+        .map { state ->
+            when (state) {
+                is SearchUiState.Success -> state.results
+                else -> emptyList()
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
@@ -303,9 +323,10 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun performExternalSearch(query: String, searchMode: String = "ALL") {
         if (query.isBlank()) {
-            _searchResults.value = emptyList()
+            _searchUiState.value = SearchUiState.Idle
             return
         }
+        _searchUiState.value = SearchUiState.Loading
         _isSearching.value = true
         saveSearchQuery(query)
 
@@ -313,11 +334,15 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // [요구사항 4] 통합 검색 및 에러 자동 폴백(Fallback) 단일 진입점 파이프라인 호출
                 val unifiedResults = BookSearchService.performUnifiedSearch(query, searchMode)
-                _searchResults.value = unifiedResults
+                if (unifiedResults.isEmpty()) {
+                    _searchUiState.value = SearchUiState.Empty
+                } else {
+                    _searchUiState.value = SearchUiState.Success(unifiedResults)
+                }
             } catch (e: Exception) {
                 Log.e("BookViewModel", "Search failure", e)
-                // 예외 발생 시 최종 안전장치로 로컬 검색 결과 폴백 적용
-                _searchResults.value = BookSearchService.getLocalFallbackResults(query)
+                // [수정이 필요한 핵심 결함 사항 1] 유령 메서드 호출 제거 및 에러 상태 처리
+                _searchUiState.value = SearchUiState.Error(e.localizedMessage ?: "검색 중 알 수 없는 에러가 발생했습니다.")
             } finally {
                 _isSearching.value = false
             }
@@ -325,7 +350,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearSearchResults() {
-        _searchResults.value = emptyList()
+        _searchUiState.value = SearchUiState.Idle
     }
 
     // --- Search Query History in SharedPrefs ---
