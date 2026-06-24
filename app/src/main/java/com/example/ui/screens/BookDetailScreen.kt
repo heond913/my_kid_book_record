@@ -895,21 +895,70 @@ fun AddSessionDialog(
 
 // Helpers to store images in local app cache directory safely (avoids Content Uri permission expiration!)
 fun copyUriToLocalCache(context: Context, uri: Uri): String? {
+    var originalBitmap: Bitmap? = null
+    var rotatedBitmap: Bitmap? = null
+    var outputStream: FileOutputStream? = null
     return try {
         val resolver = context.contentResolver
-        val inputStream = resolver.openInputStream(uri) ?: return null
-        val file = File(context.cacheDir, "kids_book_img_${UUID.randomUUID()}.jpg")
-        val outputStream = FileOutputStream(file)
         
-        inputStream.use { input ->
-            outputStream.use { output ->
-                input.copyTo(output)
-            }
+        // 1. Get EXIF Orientation flag from stream using androidx.exifinterface
+        val orientation = resolver.openInputStream(uri)?.use { stream ->
+            val exifInterface = androidx.exifinterface.media.ExifInterface(stream)
+            exifInterface.getAttributeInt(
+                androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+        // Map the orientation flag to rotation degrees
+        val degrees = when (orientation) {
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            else -> 0
         }
+
+        // 2. Decode original bitmap from stream
+        originalBitmap = resolver.openInputStream(uri)?.use { stream ->
+            android.graphics.BitmapFactory.decodeStream(stream)
+        } ?: return null
+
+        // 3. Physically rotate if degrees != 0
+        rotatedBitmap = if (degrees != 0) {
+            val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+            Bitmap.createBitmap(
+                originalBitmap,
+                0,
+                0,
+                originalBitmap.width,
+                originalBitmap.height,
+                matrix,
+                true
+            )
+        } else {
+            originalBitmap
+        }
+
+        // 4. Save normalized bitmap to local cache as JPEG
+        val file = File(context.cacheDir, "kids_book_img_${UUID.randomUUID()}.jpg")
+        outputStream = FileOutputStream(file)
+        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+        outputStream.flush()
+        
         file.absolutePath
     } catch (e: Exception) {
         e.printStackTrace()
         null
+    } finally {
+        // 5. Safe cleanup and memory recycle
+        try {
+            outputStream?.close()
+        } catch (ignored: Exception) {}
+        
+        if (originalBitmap != null && originalBitmap != rotatedBitmap) {
+            originalBitmap.recycle()
+        }
+        rotatedBitmap?.recycle()
     }
 }
 

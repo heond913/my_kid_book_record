@@ -767,9 +767,48 @@ fun cropBitmap(
     viewSizePx: Int
 ): Uri? {
     var inputStream: java.io.InputStream? = null
+    var rawBitmap: Bitmap? = null
+    var originalBitmap: Bitmap? = null
+    var croppedBitmap: Bitmap? = null
     try {
-        inputStream = context.contentResolver.openInputStream(sourceUri)
-        val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return null
+        val resolver = context.contentResolver
+        
+        // 1. Get EXIF Orientation flag
+        val orientation = resolver.openInputStream(sourceUri)?.use { stream ->
+            val exifInterface = androidx.exifinterface.media.ExifInterface(stream)
+            exifInterface.getAttributeInt(
+                androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+
+        // Map the orientation flag to rotation degrees
+        val degrees = when (orientation) {
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            else -> 0
+        }
+
+        // 2. Decode raw bitmap
+        inputStream = resolver.openInputStream(sourceUri)
+        rawBitmap = BitmapFactory.decodeStream(inputStream) ?: return null
+
+        // 3. Rotate bitmap if degrees != 0
+        originalBitmap = if (degrees != 0) {
+            val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+            Bitmap.createBitmap(
+                rawBitmap,
+                0,
+                0,
+                rawBitmap.width,
+                rawBitmap.height,
+                matrix,
+                true
+            )
+        } else {
+            rawBitmap
+        }
 
         val imgW = originalBitmap.width.toFloat()
         val imgH = originalBitmap.height.toFloat()
@@ -797,7 +836,7 @@ fun cropBitmap(
         val finalY = cropTopInBitmap.coerceIn(0, (originalBitmap.height - 1))
         val finalSize = cropSizeInBitmap.coerceIn(1, min(originalBitmap.width - finalX, originalBitmap.height - finalY))
 
-        val croppedBitmap = Bitmap.createBitmap(originalBitmap, finalX, finalY, finalSize, finalSize)
+        croppedBitmap = Bitmap.createBitmap(originalBitmap, finalX, finalY, finalSize, finalSize)
         
         // Save cropped image to temporary cache file
         val outputFile = File(context.cacheDir, "cropped_child_${System.currentTimeMillis()}.jpg")
@@ -811,6 +850,11 @@ fun cropBitmap(
         return null
     } finally {
         try { inputStream?.close() } catch (ignored: Exception) {}
+        if (rawBitmap != null && rawBitmap != originalBitmap) {
+            rawBitmap.recycle()
+        }
+        originalBitmap?.recycle()
+        croppedBitmap?.recycle()
     }
 }
 
