@@ -136,7 +136,7 @@ fun SearchScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (selectedTabStr == "ONLINE_SEARCH") "새로운 책 발굴하기" else "$childNameWithJosa 서재 검색",
+                        text = if (selectedTabStr == "ONLINE_SEARCH") "새로운 책 발굴하기" else "$childNameWithJosa 도서 검색",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -200,7 +200,7 @@ fun SearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(
-                    "MY_LIBRARY" to "🏠 내 서재 소장 도서",
+                    "MY_LIBRARY" to "🏠 읽은 도서 검색",
                     "ONLINE_SEARCH" to "🌐 온라인 새 책 찾기"
                 ).forEach { (tabId, label) ->
                     val isSelected = selectedTabStr == tabId
