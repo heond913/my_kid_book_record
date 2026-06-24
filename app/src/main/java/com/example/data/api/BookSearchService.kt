@@ -200,143 +200,167 @@ object BookSearchService {
     /**
      * Search books via Gemini API for smart kids catalog resolution.
      */
-    suspend fun searchWithGemini(query: String, model: String = "gemini-2.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchWithGemini(query: String): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is not configured or is placeholder.")
             return@withContext emptyList()
         }
 
-        val results = mutableListOf<BookSearchResult>()
-        try {
-            val systemInstruction = """
-                당신은 어린이 도서 추천 및 카탈로그 관리 전문가입니다. 
-                사용자가 도서 검색어(제목, 저자, 출판사, 키워드, ISBN 등)를 입력하면 해당 도서와 가장 연관성 높은 실제 한국어/글로벌 어린이 도서(유아~초등 고학년 대상) 정보를 최대 5개 검색하여 구조화된 JSON 배열로 반환해야 합니다.
-                
-                중요 규칙:
-                1. 카테고리는 반드시 다음 5개 항목 중 하나로 엄격하게 할당해야 합니다: "동화", "과학", "역사", "문학", "기타".
-                2. 반환 포맷은 정확히 JSON 배열 포맷이어야 합니다. 마크다운 기호 없이 순수 JSON만 응답하세요.
-            """.trimIndent()
+        val systemInstruction = """
+            당신은 어린이 도서 추천 및 카탈로그 관리 전문가입니다. 
+            사용자가 도서 검색어(제목, 저자, 출판사, 키워드, ISBN 등)를 입력하면 해당 도서와 가장 연관성 높은 실제 한국어/글로벌 어린이 도서(유아~초등 고학년 대상) 정보를 최대 5개 검색하여 구조화된 JSON 배열로 반환해야 합니다.
+            
+            중요 규칙:
+            1. 카테고리는 반드시 다음 5개 항목 중 하나로 엄격하게 할당해야 합니다: "동화", "과학", "역사", "문학", "기타".
+            2. 반환 포맷은 정확히 JSON 배열 포맷이어야 합니다. 마크다운 기호 없이 순수 JSON만 응답하세요.
+        """.trimIndent()
 
-            val prompt = """
-                사용자 검색어: "$query"
-                
-                위 검색어에 부합하는 도서 2~3개 정보를 아래 JSON 스키마에 맞게 응답해줘.
-                스팩에 없는 내용은 상상하지 말고 최대한 실제 정보에 기반해 채워줘.
-                
-                [
-                  {
-                    "title": "책 제목",
-                    "author": "저자 이름",
-                    "publisher": "출판사명",
-                    "publishDate": "출간년도 (예: 2018-05)",
-                    "isbn": "13자리 ISBN 또는 공백",
-                    "category": "동화 / 과학 / 역사 / 문학 / 기타 중 하나 택일",
-                    "description": "어린이와 부모를 위한 책에 대한 간단한 1~2문장 요약 및 추천 포인트"
-                  }
-                ]
-            """.trimIndent()
+        val prompt = """
+            사용자 검색어: "$query"
+            
+            위 검색어에 부합하는 도서 2~3개 정보를 아래 JSON 스키마에 맞게 응답해줘.
+            스팩에 없는 내용은 상상하지 말고 최대한 실제 정보에 기반해 채워줘.
+            
+            [
+              {
+                "title": "책 제목",
+                "author": "저자 이름",
+                "publisher": "출판사명",
+                "publishDate": "출간년도 (예: 2018-05)",
+                "isbn": "13자리 ISBN 또는 공백",
+                "category": "동화 / 과학 / 역사 / 문학 / 기타 중 하나 택일",
+                "description": "어린이와 부모를 위한 책에 대한 간단한 1~2문장 요약 및 추천 포인트"
+              }
+            ]
+        """.trimIndent()
 
-            val jsonRequest = JSONObject().apply {
-                put("contents", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("parts", JSONArray().apply {
-                            put(JSONObject().apply {
-                                put("text", prompt)
-                            })
-                        })
-                    })
-                })
-                put("systemInstruction", JSONObject().apply {
+        val jsonRequest = JSONObject().apply {
+            put("contents", JSONArray().apply {
+                put(JSONObject().apply {
                     put("parts", JSONArray().apply {
                         put(JSONObject().apply {
-                            put("text", systemInstruction)
+                            put("text", prompt)
                         })
                     })
                 })
-                put("generationConfig", JSONObject().apply {
-                    put("responseMimeType", "application/json")
-                    put("temperature", 0.3)
+            })
+            put("systemInstruction", JSONObject().apply {
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("text", systemInstruction)
+                    })
                 })
-            }
-
-            val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
-                .post(jsonRequest.toString().toRequestBody("application/json".toMediaType()))
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                println("GEMINI API RESPONSE CODE: ${response.code}")
-                
-                if (!response.isSuccessful) {
-                    val errorBody = response.body?.string() ?: ""
-                    println("GEMINI API FAILED: ${response.code} ${response.message}, ErrorBody: $errorBody")
-                    Log.e(TAG, "Gemini API Request Failed: Code=${response.code}, Message=${response.message}, ErrorBody=$errorBody")
-                    throw java.io.IOException("Gemini API Request Failed: Code=${response.code}, Message=${response.message}")
-                }
-
-                val bodyString = response.body?.string() ?: return@withContext emptyList()
-                println("GEMINI API SUCCESS BODY LENGTH: ${bodyString.length}")
-                
-                val responseJson = try {
-                    JSONObject(bodyString)
-                } catch (e: org.json.JSONException) {
-                    Log.e(TAG, "Failed to parse Gemini root response JSON. Body: $bodyString", e)
-                    throw org.json.JSONException("Gemini root response parsing failed: ${e.message}", e)
-                }
-
-                val candidates = responseJson.optJSONArray("candidates") ?: return@withContext emptyList()
-                val contentObj = candidates.optJSONObject(0)?.optJSONObject("content") ?: return@withContext emptyList()
-                val parts = contentObj.optJSONArray("parts") ?: return@withContext emptyList()
-                val textResponse = parts.optJSONObject(0)?.optString("text") ?: return@withContext emptyList()
-
-                val bookListJson = try {
-                    JSONArray(textResponse)
-                } catch (e: org.json.JSONException) {
-                    Log.e(TAG, "Failed to parse book list JSON array from Gemini response text: $textResponse", e)
-                    throw org.json.JSONException("Book list JSON array parsing failed: ${e.message}", e)
-                }
-
-                for (i in 0 until bookListJson.length()) {
-                    val bookObj = try {
-                        bookListJson.getJSONObject(i)
-                    } catch (e: org.json.JSONException) {
-                        Log.e(TAG, "Failed to parse individual book object at index $i", e)
-                        throw org.json.JSONException("Book object at index $i parsing failed: ${e.message}", e)
-                    }
-                    val rawCategory = bookObj.optString("category", "기타")
-                    
-                    val category = when {
-                        rawCategory.contains("동화") -> "동화"
-                        rawCategory.contains("과학") -> "과학"
-                        rawCategory.contains("역사") -> "역사"
-                        rawCategory.contains("문학") -> "문학"
-                        else -> "기타"
-                    }
-
-                    results.add(
-                        BookSearchResult(
-                            title = bookObj.optString("title", "알 수 없는 제목"),
-                            author = bookObj.optString("author", "알 수 없는 저자"),
-                            publisher = bookObj.optString("publisher", "알 수 없는 출판사"),
-                            publishDate = bookObj.optString("publishDate", ""),
-                            isbn = bookObj.optString("isbn", ""),
-                            category = category,
-                            coverUrl = null,
-                            description = bookObj.optString("description", "")
-                        )
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            try {
-                Log.e(TAG, "Gemini Catalog Search Error: ${e.message}", e)
-            } catch (logEx: Throwable) {
-                // Ignore log mocking exception in JUnit tests
-            }
-            throw e
+            })
+            put("generationConfig", JSONObject().apply {
+                put("responseMimeType", "application/json")
+                put("temperature", 0.3)
+            })
         }
-        return@withContext results
+
+        val modelChain = listOf("gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite")
+        val results = mutableListOf<BookSearchResult>()
+
+        for (modelName in modelChain) {
+            try {
+                val request = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
+                    .post(jsonRequest.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    println("GEMINI API ($modelName) RESPONSE CODE: ${response.code}")
+                    
+                    if (response.code == 503 || response.code == 429 || response.code == 404) {
+                        Log.w(TAG, "[$modelName] 실패. 예비 모델로 즉시 로테이션 우회합니다. Code: ${response.code}")
+                        return@use
+                    }
+
+                    if (!response.isSuccessful) {
+                        val errorBody = response.body?.string() ?: ""
+                        println("GEMINI API ($modelName) FAILED: ${response.code} ${response.message}, ErrorBody: $errorBody")
+                        Log.e(TAG, "Gemini API ($modelName) Request Failed: Code=${response.code}, Message=${response.message}, ErrorBody=$errorBody")
+                        return@use
+                    }
+
+                    val bodyString = response.body?.string() ?: return@use
+                    println("GEMINI API ($modelName) SUCCESS BODY LENGTH: ${bodyString.length}")
+                    
+                    val responseJson = try {
+                        JSONObject(bodyString)
+                    } catch (e: org.json.JSONException) {
+                        Log.e(TAG, "Failed to parse Gemini root response JSON for $modelName. Body: $bodyString", e)
+                        return@use
+                    }
+
+                    val candidates = responseJson.optJSONArray("candidates") ?: return@use
+                    val contentObj = candidates.optJSONObject(0)?.optJSONObject("content") ?: return@use
+                    val parts = contentObj.optJSONArray("parts") ?: return@use
+                    val textResponse = parts.optJSONObject(0)?.optString("text") ?: return@use
+
+                    val bookListJson = try {
+                        JSONArray(textResponse)
+                    } catch (e: org.json.JSONException) {
+                        Log.e(TAG, "Failed to parse book list JSON array from Gemini ($modelName) response text: $textResponse", e)
+                        return@use
+                    }
+
+                    for (i in 0 until bookListJson.length()) {
+                        val bookObj = try {
+                            bookListJson.getJSONObject(i)
+                        } catch (e: org.json.JSONException) {
+                            Log.e(TAG, "Failed to parse individual book object at index $i from $modelName", e)
+                            continue
+                        }
+                        val rawCategory = bookObj.optString("category", "기타")
+                        
+                        val category = when {
+                            rawCategory.contains("동화") -> "동화"
+                            rawCategory.contains("과학") -> "과학"
+                            rawCategory.contains("역사") -> "역사"
+                            rawCategory.contains("문학") -> "문학"
+                            else -> "기타"
+                        }
+
+                        // 다중 저자 정보가 뭉개지지 않도록 JSONArray와 String 타입을 모두 정밀하게 처리 및 joinToString
+                        val authorVal = bookObj.opt("author")
+                        val authorStr = when (authorVal) {
+                            is JSONArray -> {
+                                val list = mutableListOf<String>()
+                                for (j in 0 until authorVal.length()) {
+                                    list.add(authorVal.optString(j))
+                                }
+                                list.joinToString(", ")
+                            }
+                            else -> bookObj.optString("author", "알 수 없는 저자")
+                        }
+
+                        results.add(
+                            BookSearchResult(
+                                title = bookObj.optString("title", "알 수 없는 제목"),
+                                author = authorStr,
+                                publisher = bookObj.optString("publisher", "알 수 없는 출판사"),
+                                publishDate = bookObj.optString("publishDate", ""),
+                                isbn = bookObj.optString("isbn", ""),
+                                category = category,
+                                coverUrl = null,
+                                description = bookObj.optString("description", "")
+                            )
+                        )
+                    }
+                    if (results.isNotEmpty()) {
+                        return@withContext results
+                    }
+                }
+            } catch (e: Exception) {
+                try {
+                    Log.e(TAG, "[$modelName] 통신 중 돌발 예외 발생. 다음 예비 체인으로 우회합니다.", e)
+                } catch (logEx: Throwable) {
+                    // Ignore log mocking exception in JUnit tests
+                }
+            }
+        }
+        return@withContext emptyList()
     }
 
     /**
