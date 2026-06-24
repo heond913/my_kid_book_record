@@ -200,7 +200,7 @@ object BookSearchService {
     /**
      * Search books via Gemini API for smart kids catalog resolution.
      */
-    suspend fun searchWithGemini(query: String, model: String = "gemini-1.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchWithGemini(query: String, model: String = "gemini-2.5-flash"): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is not configured or is placeholder.")
@@ -272,20 +272,38 @@ object BookSearchService {
                     val errorBody = response.body?.string() ?: ""
                     println("GEMINI API FAILED: ${response.code} ${response.message}, ErrorBody: $errorBody")
                     Log.e(TAG, "Gemini API Request Failed: Code=${response.code}, Message=${response.message}, ErrorBody=$errorBody")
-                    return@withContext emptyList()
+                    throw java.io.IOException("Gemini API Request Failed: Code=${response.code}, Message=${response.message}")
                 }
 
                 val bodyString = response.body?.string() ?: return@withContext emptyList()
                 println("GEMINI API SUCCESS BODY LENGTH: ${bodyString.length}")
-                val responseJson = JSONObject(bodyString)
+                
+                val responseJson = try {
+                    JSONObject(bodyString)
+                } catch (e: org.json.JSONException) {
+                    Log.e(TAG, "Failed to parse Gemini root response JSON. Body: $bodyString", e)
+                    throw org.json.JSONException("Gemini root response parsing failed: ${e.message}", e)
+                }
+
                 val candidates = responseJson.optJSONArray("candidates") ?: return@withContext emptyList()
                 val contentObj = candidates.optJSONObject(0)?.optJSONObject("content") ?: return@withContext emptyList()
                 val parts = contentObj.optJSONArray("parts") ?: return@withContext emptyList()
                 val textResponse = parts.optJSONObject(0)?.optString("text") ?: return@withContext emptyList()
 
-                val bookListJson = JSONArray(textResponse)
+                val bookListJson = try {
+                    JSONArray(textResponse)
+                } catch (e: org.json.JSONException) {
+                    Log.e(TAG, "Failed to parse book list JSON array from Gemini response text: $textResponse", e)
+                    throw org.json.JSONException("Book list JSON array parsing failed: ${e.message}", e)
+                }
+
                 for (i in 0 until bookListJson.length()) {
-                    val bookObj = bookListJson.getJSONObject(i)
+                    val bookObj = try {
+                        bookListJson.getJSONObject(i)
+                    } catch (e: org.json.JSONException) {
+                        Log.e(TAG, "Failed to parse individual book object at index $i", e)
+                        throw org.json.JSONException("Book object at index $i parsing failed: ${e.message}", e)
+                    }
                     val rawCategory = bookObj.optString("category", "기타")
                     
                     val category = when {
@@ -312,10 +330,11 @@ object BookSearchService {
             }
         } catch (e: Exception) {
             try {
-                Log.e(TAG, "Gemini Catalog Search Error", e)
+                Log.e(TAG, "Gemini Catalog Search Error: ${e.message}", e)
             } catch (logEx: Throwable) {
                 // Ignore log mocking exception in JUnit tests
             }
+            throw e
         }
         return@withContext results
     }
@@ -344,7 +363,12 @@ object BookSearchService {
         
         // 2. 실패 혹은 결과가 0개인 경우 -> Gemini AI 검색으로 즉시 Fallback
         Log.w(TAG, "performUnifiedSearch: Google Books returned empty or failed. Triggering fallback to Gemini AI...")
-        val geminiResults = searchWithGemini(query)
+        val geminiResults = try {
+            searchWithGemini(query)
+        } catch (e: Exception) {
+            Log.e(TAG, "performUnifiedSearch: Gemini fallback search failed.", e)
+            emptyList()
+        }
         if (geminiResults.isNotEmpty()) {
             Log.d(TAG, "performUnifiedSearch: Recovered ${geminiResults.size} results via Gemini AI Fallback.")
             return geminiResults
