@@ -73,9 +73,25 @@ object BookSearchService {
     /**
      * Search books via Google Books API with explicit API key authentication
      */
-    suspend fun searchGoogleBooks(query: String): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchGoogleBooks(
+        query: String,
+        startTime: Long = System.currentTimeMillis(),
+        timeoutMs: Long = 10000L
+    ): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val results = mutableListOf<BookSearchResult>()
         try {
+            val remainingTime = timeoutMs - (System.currentTimeMillis() - startTime)
+            if (remainingTime <= 500) {
+                Log.w(TAG, "searchGoogleBooks: No time remaining ($remainingTime ms). Skipping.")
+                return@withContext emptyList()
+            }
+
+            val customClient = client.newBuilder()
+                .connectTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                .readTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                .writeTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                .build()
+
             val encodedQuery = URLEncoder.encode(query, "UTF-8")
             val apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY
             // [요구사항 1] 구글 북스 API 키/권한 분리
@@ -87,7 +103,7 @@ object BookSearchService {
                 .get()
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            customClient.newCall(request).execute().use { response ->
                 println("GOOGLE BOOKS RESPONSE CODE: ${response.code}")
                 Log.d(TAG, "searchGoogleBooks response code: ${response.code}")
                 
@@ -200,7 +216,11 @@ object BookSearchService {
     /**
      * Search books via Gemini API for smart kids catalog resolution.
      */
-    suspend fun searchWithGemini(query: String): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchWithGemini(
+        query: String,
+        startTime: Long = System.currentTimeMillis(),
+        timeoutMs: Long = 10000L
+    ): List<BookSearchResult> = withContext(Dispatchers.IO) {
         val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
             Log.w(TAG, "Gemini API key is not configured or is placeholder.")
@@ -263,12 +283,24 @@ object BookSearchService {
 
         for (modelName in modelChain) {
             try {
+                val remainingTime = timeoutMs - (System.currentTimeMillis() - startTime)
+                if (remainingTime <= 500) {
+                    Log.w(TAG, "searchWithGemini [$modelName]: No time remaining ($remainingTime ms). Breaking loop.")
+                    break
+                }
+
+                val customClient = client.newBuilder()
+                    .connectTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                    .readTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                    .writeTimeout(remainingTime, TimeUnit.MILLISECONDS)
+                    .build()
+
                 val request = Request.Builder()
                     .url("https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey")
                     .post(jsonRequest.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                customClient.newCall(request).execute().use { response ->
                     println("GEMINI API ($modelName) RESPONSE CODE: ${response.code}")
                     
                     if (response.code == 503 || response.code == 429 || response.code == 404) {
@@ -369,13 +401,21 @@ object BookSearchService {
     suspend fun performUnifiedSearch(query: String, searchMode: String = "ALL"): List<BookSearchResult> {
         Log.d(TAG, "performUnifiedSearch query: $query, mode: $searchMode")
         
+        val startTime = System.currentTimeMillis()
+        val timeoutMs = 10000L // 10초 타임아웃 제한
+        
         if (searchMode == "AI") {
-            return searchWithGemini(query)
+            return try {
+                searchWithGemini(query, startTime, timeoutMs)
+            } catch (e: Exception) {
+                Log.e(TAG, "performUnifiedSearch: Gemini AI search failed or timed out.", e)
+                emptyList()
+            }
         }
         
         // 1. Google Books API 검색 시도
         val googleResults = try {
-            searchGoogleBooks(query)
+            searchGoogleBooks(query, startTime, timeoutMs)
         } catch (e: Exception) {
             Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback pipeline.", e)
             emptyList()
@@ -385,12 +425,15 @@ object BookSearchService {
         val combinedResults = mutableListOf<BookSearchResult>()
         combinedResults.addAll(googleResults)
         
-        if (combinedResults.size < 30) {
-            Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini AI to supplement.")
+        val elapsed = System.currentTimeMillis() - startTime
+        val remaining = timeoutMs - elapsed
+        
+        if (combinedResults.size < 30 && remaining > 500) {
+            Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini AI to supplement. Remaining budget: $remaining ms.")
             val geminiResults = try {
-                searchWithGemini(query)
+                searchWithGemini(query, startTime, timeoutMs)
             } catch (e: Exception) {
-                Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed.", e)
+                Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed or timed out.", e)
                 emptyList()
             }
             

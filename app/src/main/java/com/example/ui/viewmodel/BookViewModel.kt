@@ -30,6 +30,7 @@ sealed interface SearchUiState {
 class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: BookRepository
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
+    private val searchCache = mutableMapOf<Pair<String, String>, List<BookSearchResult>>()
 
     private val _childNameState = MutableStateFlow(getChildName())
     val childNameState: StateFlow<String> = _childNameState.asStateFlow()
@@ -326,6 +327,15 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
             _searchUiState.value = SearchUiState.Idle
             return
         }
+        
+        val cacheKey = Pair(query.trim().lowercase(), searchMode)
+        val cached = searchCache[cacheKey]
+        if (cached != null) {
+            Log.d("BookViewModel", "Returning cached search results for query: $query, mode: $searchMode")
+            _searchUiState.value = SearchUiState.Success(cached)
+            return
+        }
+
         _searchUiState.value = SearchUiState.Loading
         _isSearching.value = true
         saveSearchQuery(query)
@@ -337,6 +347,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 if (unifiedResults.isEmpty()) {
                     _searchUiState.value = SearchUiState.Empty
                 } else {
+                    searchCache[cacheKey] = unifiedResults
                     _searchUiState.value = SearchUiState.Success(unifiedResults)
                 }
             } catch (e: Exception) {
