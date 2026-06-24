@@ -1,11 +1,25 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.math.min
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.shadow
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,18 +55,24 @@ import coil.compose.AsyncImage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChildNameInputScreen(
+    initialName: String = "",
+    initialGender: String = "BOY",
+    initialPhotoUri: String = "",
     onBack: () -> Unit,
     onComplete: (name: String, gender: String, photoUri: String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("BOY") } // "BOY" or "GIRL"
-    var photoUri by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName) }
+    var gender by remember { mutableStateOf(initialGender) } // "BOY" or "GIRL"
+    var photoUri by remember { mutableStateOf(initialPhotoUri) }
+
+    // Uri chosen by the system photo picker, before we crop it
+    var imageToCrop by remember { mutableStateOf<Uri?>(null) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
             if (uri != null) {
-                photoUri = uri.toString()
+                imageToCrop = uri
             }
         }
     )
@@ -77,6 +97,18 @@ fun ChildNameInputScreen(
         animationSpec = tween(durationMillis = 300),
         label = "buttonTextColor"
     )
+
+    // Render Image Cropper Dialog if an image was chosen
+    if (imageToCrop != null) {
+        ImageCropperDialog(
+            imageUri = imageToCrop!!,
+            onDismiss = { imageToCrop = null },
+            onCropped = { croppedUri ->
+                photoUri = croppedUri.toString()
+                imageToCrop = null
+            }
+        )
+    }
 
     Scaffold(
         containerColor = backgroundColor,
@@ -123,8 +155,75 @@ fun ChildNameInputScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 2. Center Illustration (Book stack with sprout)
-            SproutBookStack(modifier = Modifier.padding(vertical = 8.dp))
+            // 2. Interactive Circular Thumbnail Profile Preview Area (Immediately updates)
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(110.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .background(
+                        if (photoUri.isNotEmpty()) Color.Transparent
+                        else when (gender) {
+                            "BOY" -> Color(0xFFE0F2FE) // Soft boy blue background
+                            "GIRL" -> Color(0xFFFCE7F3) // Soft girl pink background
+                            else -> Color(0xFFFFF9C4)
+                        },
+                        CircleShape
+                    )
+                    .border(
+                        3.dp,
+                        when (gender) {
+                            "BOY" -> Color(0xFF0284C7)
+                            "GIRL" -> Color(0xFFDB2777)
+                            else -> Color(0xFF8B5CF6)
+                        },
+                        CircleShape
+                    )
+                    .clip(CircleShape)
+                    .clickable {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (photoUri.isNotEmpty()) {
+                    AsyncImage(
+                        model = photoUri,
+                        contentDescription = "아이 사진 미리보기",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = if (gender == "BOY") "👦🏻" else "👧🏻",
+                        fontSize = 52.sp
+                    )
+                }
+
+                // Camera Badge Icon in bottom-right corner
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.White, CircleShape)
+                            .border(1.5.dp, Color(0xFFE2E8F0), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "사진 수정",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -305,7 +404,24 @@ fun ChildNameInputScreen(
                     Box(
                         modifier = Modifier
                             .size(64.dp)
-                            .background(Color(0xFFFFF9C4), CircleShape)
+                            .background(
+                                if (photoUri.isNotEmpty()) Color.Transparent
+                                else when (gender) {
+                                    "BOY" -> Color(0xFFE0F2FE)
+                                    "GIRL" -> Color(0xFFFCE7F3)
+                                    else -> Color(0xFFFFF9C4)
+                                },
+                                CircleShape
+                            )
+                            .border(
+                                1.5.dp,
+                                when (gender) {
+                                    "BOY" -> Color(0xFF0284C7).copy(alpha = 0.4f)
+                                    "GIRL" -> Color(0xFFDB2777).copy(alpha = 0.4f)
+                                    else -> Color(0xFF8B5CF6).copy(alpha = 0.4f)
+                                },
+                                CircleShape
+                            )
                             .clip(CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -320,7 +436,11 @@ fun ChildNameInputScreen(
                             Icon(
                                 imageVector = Icons.Default.PhotoCamera,
                                 contentDescription = "사진 추가",
-                                tint = Color(0xFF8B5CF6),
+                                tint = when (gender) {
+                                    "BOY" -> Color(0xFF0284C7)
+                                    "GIRL" -> Color(0xFFDB2777)
+                                    else -> Color(0xFF8B5CF6)
+                                },
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -336,7 +456,7 @@ fun ChildNameInputScreen(
                             color = textColor
                         )
                         Text(
-                            text = if (photoUri.isNotEmpty()) "클릭하여 사진 변경" else "포트폴리오에 예쁘게 노출됩니다",
+                            text = if (photoUri.isNotEmpty()) "클릭하여 사진 크롭 및 변경" else "포트폴리오에 예쁘게 노출됩니다",
                             fontSize = 12.sp,
                             color = textColor.copy(alpha = 0.6f)
                         )
@@ -509,3 +629,188 @@ fun SproutBookStack(modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+fun ImageCropperDialog(
+    imageUri: Uri,
+    onDismiss: () -> Unit,
+    onCropped: (Uri) -> Unit
+) {
+    val context = LocalContext.current
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    val croppedUri = cropBitmap(
+                        context = context,
+                        sourceUri = imageUri,
+                        scale = scale,
+                        offsetX = offsetX,
+                        offsetY = offsetY,
+                        viewSizePx = 600 // High-quality resolution for crop box
+                    )
+                    if (croppedUri != null) {
+                        onCropped(croppedUri)
+                    } else {
+                        onDismiss()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6))
+            ) {
+                Text("자르기 완료")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", color = Color(0xFF44403C))
+            }
+        },
+        title = {
+            Text(
+                text = "사진 자르기",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF44403C)
+            )
+        },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "두 손가락으로 확대/축소하고, 드래그하여 원 안에 맞게 조정해 주세요.",
+                    fontSize = 13.sp,
+                    color = Color(0xFF44403C).copy(alpha = 0.7f),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Interactive Crop Area Viewport
+                Box(
+                    modifier = Modifier
+                        .size(260.dp)
+                        .background(Color.Black, shape = RoundedCornerShape(12.dp))
+                        .clipToBounds()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                offsetX += pan.x * scale
+                                offsetY += pan.y * scale
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Loaded image with dynamic layout transformations
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offsetX,
+                                translationY = offsetY
+                            ),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    // Semi-transparent circle overlay using Border + Background
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp)
+                            .border(3.dp, Color.White, CircleShape)
+                            .background(Color.Transparent)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Custom slider for absolute zoom control
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("확대", fontSize = 12.sp, color = Color(0xFF44403C), modifier = Modifier.width(36.dp))
+                    Slider(
+                        value = scale,
+                        onValueChange = { scale = it },
+                        valueRange = 1f..5f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF8B5CF6),
+                            activeTrackColor = Color(0xFF8B5CF6)
+                        )
+                    )
+                }
+            }
+        },
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        ),
+        modifier = Modifier.padding(24.dp)
+    )
+}
+
+fun cropBitmap(
+    context: android.content.Context,
+    sourceUri: Uri,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    viewSizePx: Int
+): Uri? {
+    var inputStream: java.io.InputStream? = null
+    try {
+        inputStream = context.contentResolver.openInputStream(sourceUri)
+        val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return null
+
+        val imgW = originalBitmap.width.toFloat()
+        val imgH = originalBitmap.height.toFloat()
+
+        // Match ContentScale.Fit inside a square viewport of viewSizePx
+        val baseScale = min(viewSizePx.toFloat() / imgW, viewSizePx.toFloat() / imgH)
+        val activeScale = baseScale * scale
+
+        val displayedW = imgW * activeScale
+        val displayedH = imgH * activeScale
+
+        val initX = (viewSizePx - displayedW) / 2f
+        val initY = (viewSizePx - displayedH) / 2f
+
+        val currentImgLeft = initX + offsetX
+        val currentImgTop = initY + offsetY
+
+        // Crop window is [0, viewSizePx] relative to viewport
+        val cropLeftInBitmap = (-currentImgLeft / activeScale).toInt()
+        val cropTopInBitmap = (-currentImgTop / activeScale).toInt()
+        val cropSizeInBitmap = (viewSizePx / activeScale).toInt()
+
+        // Boundaries checks
+        val finalX = cropLeftInBitmap.coerceIn(0, (originalBitmap.width - 1))
+        val finalY = cropTopInBitmap.coerceIn(0, (originalBitmap.height - 1))
+        val finalSize = cropSizeInBitmap.coerceIn(1, min(originalBitmap.width - finalX, originalBitmap.height - finalY))
+
+        val croppedBitmap = Bitmap.createBitmap(originalBitmap, finalX, finalY, finalSize, finalSize)
+        
+        // Save cropped image to temporary cache file
+        val outputFile = File(context.cacheDir, "cropped_child_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(outputFile).use { out ->
+            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        }
+        
+        return Uri.fromFile(outputFile)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
+    } finally {
+        try { inputStream?.close() } catch (ignored: Exception) {}
+    }
+}
+
