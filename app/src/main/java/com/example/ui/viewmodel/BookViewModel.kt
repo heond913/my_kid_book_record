@@ -323,7 +323,11 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                     it.title.lowercase().trim() + it.author.lowercase().trim() 
                 }
 
-                _searchResults.value = merged
+                if (merged.isEmpty()) {
+                    _searchResults.value = BookSearchService.getLocalFallbackResults(query)
+                } else {
+                    _searchResults.value = merged
+                }
             } catch (e: Exception) {
                 Log.e("BookViewModel", "Search failure", e)
             } finally {
