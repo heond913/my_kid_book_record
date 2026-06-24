@@ -1,3 +1,7 @@
+import java.io.File
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -5,6 +9,17 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
 }
+
+// Load local.properties and environment variables robustly
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+  localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+
+val geminiApiKey: String = System.getenv("GEMINI_API_KEY")
+  ?: localProperties.getProperty("GEMINI_API_KEY")
+  ?: ""
 
 android {
   namespace = "com.example"
@@ -18,6 +33,9 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // [요구사항 1] defaultConfig 내부에 GEMINI_API_KEY buildConfigField 추가
+    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
   }
 
   signingConfigs {
@@ -63,6 +81,8 @@ android {
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
+  // Ignore GEMINI_API_KEY to prevent duplicate field generation
+  ignoreList.add("GEMINI_API_KEY")
 }
 
 // Some unused dependencies are commented out below instead of being removed.
