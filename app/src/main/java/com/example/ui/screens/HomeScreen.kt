@@ -45,10 +45,25 @@ fun HomeScreen(
     viewModel: BookViewModel,
     onNavigateToBookDetail: (Int) -> Unit,
     onNavigateToAddBook: () -> Unit,
-    onNavigateToNewSession: (Int) -> Unit
+    onNavigateToNewSession: (Int) -> Unit,
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val books by viewModel.books.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
+
+    val childName by viewModel.childNameState.collectAsState()
+    val childGender by viewModel.childGenderState.collectAsState()
+    val childPhotoUri by viewModel.childPhotoUriState.collectAsState()
+
+    val childNameWithJosa = remember(childName) {
+        val name = childName.ifEmpty { "서준" }
+        if (name == "서준") "서준이의"
+        else if (name.lastOrNull()?.let { (it.code - 0xAC00) % 28 > 0 && it.code in 0xAC00..0xD7A3 } == true) {
+            "${name}이의"
+        } else {
+            "${name}의"
+        }
+    }
 
     var calendar by remember { mutableStateOf(Calendar.getInstance()) }
     var selectedDate by remember { mutableStateOf(Calendar.getInstance().apply { time = Date() }) }
@@ -118,7 +133,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "서준이의 포트폴리오",
+                            text = "$childNameWithJosa 포트폴리오",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onBackground
@@ -128,16 +143,47 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(56.dp)
                             .shadow(elevation = 6.dp, shape = CircleShape)
-                            .background(Color(0xFFFFF59D), CircleShape) // Warm creamy yellow background
-                            .border(2.dp, Color(0xFF8B5CF6).copy(alpha = 0.5f), CircleShape),
+                            .background(
+                                if (childPhotoUri.isNotEmpty()) Color.Transparent
+                                else when (childGender) {
+                                    "BOY" -> Color(0xFFE0F2FE) // Soft boy blue
+                                    "GIRL" -> Color(0xFFFCE7F3) // Soft girl pink
+                                    else -> Color(0xFFFFF59D) // Default yellow
+                                },
+                                CircleShape
+                            )
+                            .border(
+                                2.dp,
+                                when (childGender) {
+                                    "BOY" -> Color(0xFF0284C7).copy(alpha = 0.5f)
+                                    "GIRL" -> Color(0xFFDB2777).copy(alpha = 0.5f)
+                                    else -> Color(0xFF8B5CF6).copy(alpha = 0.5f)
+                                },
+                                CircleShape
+                            )
+                            .clip(CircleShape)
+                            .clickable { onNavigateToProfile() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ChildCare,
-                            contentDescription = "아이 프로필",
-                            tint = Color(0xFF8B5CF6),
-                            modifier = Modifier.size(32.dp)
-                        )
+                        if (childPhotoUri.isNotEmpty()) {
+                            AsyncImage(
+                                model = childPhotoUri,
+                                contentDescription = "아이 프로필",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.ChildCare,
+                                contentDescription = "아이 프로필",
+                                tint = when (childGender) {
+                                    "BOY" -> Color(0xFF0284C7)
+                                    "GIRL" -> Color(0xFFDB2777)
+                                    else -> Color(0xFF8B5CF6)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }

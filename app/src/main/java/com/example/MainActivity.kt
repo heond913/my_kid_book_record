@@ -74,6 +74,10 @@ fun MainAppScreenHost(
         Screen.Goals.route
     )
 
+    val startDest = remember {
+        if (viewModel.getChildName().isEmpty()) "child_name_input" else Screen.Home.route
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -119,9 +123,28 @@ fun MainAppScreenHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = startDest,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable("child_name_input") {
+                ChildNameInputScreen(
+                    onBack = {
+                        // Pop back stack if possible, otherwise finish activity
+                        if (!navController.popBackStack()) {
+                            (navController.context as? android.app.Activity)?.finish()
+                        }
+                    },
+                    onComplete = { name, gender, photoUri ->
+                        viewModel.setChildName(name)
+                        viewModel.setChildGender(gender)
+                        viewModel.setChildPhotoUri(photoUri)
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo("child_name_input") { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Screen.Home.route) {
                 HomeScreen(
                     viewModel = viewModel,
@@ -133,12 +156,20 @@ fun MainAppScreenHost(
                     },
                     onNavigateToNewSession = { bookId ->
                         navController.navigate("book_detail/$bookId")
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate("child_name_input")
                     }
                 )
             }
             
             composable(Screen.Report.route) {
-                ReportScreen(viewModel = viewModel)
+                ReportScreen(
+                    viewModel = viewModel,
+                    onNavigateToProfile = {
+                        navController.navigate("child_name_input")
+                    }
+                )
             }
             
             composable(Screen.Search.route) {
@@ -146,12 +177,20 @@ fun MainAppScreenHost(
                     viewModel = viewModel,
                     onNavigateToBookDetail = { bookId ->
                         navController.navigate("book_detail/$bookId")
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate("child_name_input")
                     }
                 )
             }
             
             composable(Screen.Goals.route) {
-                GoalScreen(viewModel = viewModel)
+                GoalScreen(
+                    viewModel = viewModel,
+                    onNavigateToProfile = {
+                        navController.navigate("child_name_input")
+                    }
+                )
             }
             
             composable(

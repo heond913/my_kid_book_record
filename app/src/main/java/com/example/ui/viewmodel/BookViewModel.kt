@@ -21,6 +21,42 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: BookRepository
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
 
+    private val _childNameState = MutableStateFlow(getChildName())
+    val childNameState: StateFlow<String> = _childNameState.asStateFlow()
+
+    private val _childGenderState = MutableStateFlow(getChildGender())
+    val childGenderState: StateFlow<String> = _childGenderState.asStateFlow()
+
+    private val _childPhotoUriState = MutableStateFlow(getChildPhotoUri())
+    val childPhotoUriState: StateFlow<String> = _childPhotoUriState.asStateFlow()
+
+    fun getChildName(): String {
+        return sharedPrefs.getString("child_name", "") ?: ""
+    }
+
+    fun setChildName(name: String) {
+        sharedPrefs.edit().putString("child_name", name).apply()
+        _childNameState.value = name
+    }
+
+    fun getChildGender(): String {
+        return sharedPrefs.getString("child_gender", "") ?: ""
+    }
+
+    fun setChildGender(gender: String) {
+        sharedPrefs.edit().putString("child_gender", gender).apply()
+        _childGenderState.value = gender
+    }
+
+    fun getChildPhotoUri(): String {
+        return sharedPrefs.getString("child_photo_uri", "") ?: ""
+    }
+
+    fun setChildPhotoUri(uri: String) {
+        sharedPrefs.edit().putString("child_photo_uri", uri).apply()
+        _childPhotoUriState.value = uri
+    }
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = BookRepository(database)
