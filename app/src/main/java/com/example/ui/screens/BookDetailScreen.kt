@@ -230,12 +230,6 @@ fun BookDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 StatusPill(
-                                    label = "읽고싶은",
-                                    isActive = activeBook.status == Book.STATUS_WANT_TO_READ,
-                                    color = Color(0xFF90A4AE),
-                                    onClick = { viewModel.updateBookStatus(activeBook.id, Book.STATUS_WANT_TO_READ) }
-                                )
-                                StatusPill(
                                     label = "읽는중",
                                     isActive = activeBook.status == Book.STATUS_READING,
                                     color = Color(0xFF64B5F6),
@@ -543,6 +537,7 @@ fun BookDetailScreen(
             if (showAddSessionDialog) {
                 AddSessionDialog(
                     bookId = activeBook.id,
+                    initialDate = viewModel.getFormattedDate(viewModel.selectedDate.value),
                     onDismiss = { showAddSessionDialog = false },
                     onSubmit = { startDate, endDate, title, memo, rating, tags, photosList ->
                         viewModel.addReadingSession(
@@ -724,6 +719,7 @@ fun SessionTimelineItem(
 @Composable
 fun AddSessionDialog(
     bookId: Int,
+    initialDate: String,
     onDismiss: () -> Unit,
     onSubmit: (
         startDate: String,
@@ -737,9 +733,8 @@ fun AddSessionDialog(
 ) {
     val context = LocalContext.current
     
-    val sdf = SimpleDateFormat("yy/MM/dd", Locale.getDefault())
-    var startDate by remember { mutableStateOf(sdf.format(Date())) }
-    var endDate by remember { mutableStateOf(sdf.format(Date())) }
+    var startDate by remember { mutableStateOf(initialDate) }
+    var endDate by remember { mutableStateOf(initialDate) }
     
     var title by remember { mutableStateOf("") }
     var memo by remember { mutableStateOf("") }

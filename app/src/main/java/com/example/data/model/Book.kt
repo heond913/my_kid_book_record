@@ -13,7 +13,7 @@ data class Book(
     val isbn: String,
     val category: String, // e.g. "동화", "과학", "역사", "문학", "기타"
     val coverUrl: String? = null,
-    val status: String = STATUS_WANT_TO_READ,
+    val status: String = STATUS_READING,
     val addedTimestamp: Long = System.currentTimeMillis(),
     val childName: String = ""
 ) {

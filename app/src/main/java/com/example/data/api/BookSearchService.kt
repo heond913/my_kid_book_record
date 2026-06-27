@@ -384,6 +384,8 @@ object BookSearchService {
                         return@withContext results
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 try {
                     Log.e(TAG, "[$modelName] 통신 중 돌발 예외 발생. 다음 예비 체인으로 우회합니다.", e)
@@ -402,61 +404,82 @@ object BookSearchService {
         Log.d(TAG, "performUnifiedSearch query: $query, mode: $searchMode")
         
         val startTime = System.currentTimeMillis()
-        val timeoutMs = 10000L // 10초 타임아웃 제한
         
         if (searchMode == "AI") {
-            return try {
-                // '새 책 등록하기'의 'AI 검색'은 10초 타임아웃 로직을 제거하고 60초의 넉넉한 예산을 부여
-                searchWithGemini(query, startTime = System.currentTimeMillis(), timeoutMs = 60000L)
+            val results = mutableListOf<BookSearchResult>()
+            val timeoutMs = 10000L // AI 검색은 10초 타임아웃
+            try {
+                kotlinx.coroutines.withTimeout(timeoutMs) {
+                    val geminiRes = searchWithGemini(query, startTime = startTime, timeoutMs = timeoutMs)
+                    results.addAll(geminiRes)
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.w(TAG, "performUnifiedSearch [AI Mode] timed out after ${timeoutMs}ms. Returning collected results so far: ${results.size}")
             } catch (e: Exception) {
                 Log.e(TAG, "performUnifiedSearch: Gemini AI search failed.", e)
-                emptyList()
+            }
+            
+            return if (results.isNotEmpty()) {
+                results
+            } else {
+                Log.w(TAG, "performUnifiedSearch [AI Mode] returned empty results. Using local fallback.")
+                getLocalFallbackResults(query)
             }
         }
         
-        // 1. Google Books API 검색 시도
-        val googleResults = try {
-            searchGoogleBooks(query, startTime, timeoutMs)
-        } catch (e: Exception) {
-            Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback pipeline.", e)
-            emptyList()
-        }
-        
-        // 2. 만약 결과가 30개 미만이면, Google Books 결과와 Gemini AI 결과를 결합하여 최대 30개에 수렴시킴
+        // ALL Mode (도서 검색): 5초 타임아웃
+        val timeoutMs = 5000L
         val combinedResults = mutableListOf<BookSearchResult>()
-        combinedResults.addAll(googleResults)
         
-        val elapsed = System.currentTimeMillis() - startTime
-        val remaining = timeoutMs - elapsed
-        
-        if (combinedResults.size < 30 && remaining > 500) {
-            Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini AI to supplement. Remaining budget: $remaining ms.")
-            val geminiResults = try {
-                searchWithGemini(query, startTime, timeoutMs)
-            } catch (e: Exception) {
-                Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed or timed out.", e)
-                emptyList()
-            }
-            
-            val processedTitles = combinedResults.map { it.title.trim().lowercase() }.toMutableSet()
-            val processedIsbns = combinedResults.map { it.isbn.trim() }.filter { it.isNotEmpty() }.toMutableSet()
-            
-            for (book in geminiResults) {
-                if (combinedResults.size >= 30) break
-                val titleKey = book.title.trim().lowercase()
-                val isbnKey = book.isbn.trim()
+        try {
+            kotlinx.coroutines.withTimeout(timeoutMs) {
+                // 1. Google Books API 검색 시도
+                val googleResults = try {
+                    searchGoogleBooks(query, startTime, timeoutMs)
+                } catch (e: Exception) {
+                    Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback pipeline.", e)
+                    emptyList()
+                }
+                combinedResults.addAll(googleResults)
                 
-                val isDuplicateTitle = processedTitles.contains(titleKey)
-                val isDuplicateIsbn = isbnKey.isNotEmpty() && processedIsbns.contains(isbnKey)
+                // 2. 만약 결과가 30개 미만이면, Google Books 결과와 Gemini AI 결과를 결합하여 최대 30개에 수렴시킴
+                val elapsed = System.currentTimeMillis() - startTime
+                val remaining = timeoutMs - elapsed
                 
-                if (!isDuplicateTitle && !isDuplicateIsbn) {
-                    combinedResults.add(book)
-                    processedTitles.add(titleKey)
-                    if (isbnKey.isNotEmpty()) {
-                        processedIsbns.add(isbnKey)
+                if (combinedResults.size < 30 && remaining > 500) {
+                    Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini AI to supplement. Remaining budget: $remaining ms.")
+                    val geminiResults = try {
+                        searchWithGemini(query, startTime, timeoutMs)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed or timed out.", e)
+                        emptyList()
+                    }
+                    
+                    val processedTitles = combinedResults.map { it.title.trim().lowercase() }.toMutableSet()
+                    val processedIsbns = combinedResults.map { it.isbn.trim() }.filter { it.isNotEmpty() }.toMutableSet()
+                    
+                    for (book in geminiResults) {
+                        if (combinedResults.size >= 30) break
+                        val titleKey = book.title.trim().lowercase()
+                        val isbnKey = book.isbn.trim()
+                        
+                        val isDuplicateTitle = processedTitles.contains(titleKey)
+                        val isDuplicateIsbn = isbnKey.isNotEmpty() && processedIsbns.contains(isbnKey)
+                        
+                        if (!isDuplicateTitle && !isDuplicateIsbn) {
+                            combinedResults.add(book)
+                            processedTitles.add(titleKey)
+                            if (isbnKey.isNotEmpty()) {
+                                processedIsbns.add(isbnKey)
+                            }
+                        }
                     }
                 }
             }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            Log.w(TAG, "performUnifiedSearch [ALL Mode] timed out after ${timeoutMs}ms. Returning collected results so far: ${combinedResults.size}")
+        } catch (e: Exception) {
+            Log.e(TAG, "performUnifiedSearch: Search failed.", e)
         }
         
         if (combinedResults.isNotEmpty()) {

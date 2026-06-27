@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import androidx.room.withTransaction
 import com.example.data.db.*
 import com.example.data.model.*
 import kotlinx.coroutines.flow.Flow
@@ -83,5 +84,45 @@ class BookRepository(private val database: AppDatabase) {
             changeDate = changeDate
         )
         historyDao.insertHistory(history)
+    }
+
+    /**
+     * Inserts a book and its starting history log/reading session in a single database transaction.
+     */
+    suspend fun insertBookWithSessionAndHistory(
+        book: Book,
+        status: String,
+        selectedDateStr: String
+    ): Long {
+        return database.withTransaction {
+            val bookId = bookDao.insertBook(book)
+            
+            val history = StatusHistory(
+                bookId = bookId.toInt(),
+                fromStatus = "등록",
+                toStatus = status,
+                changeDate = selectedDateStr
+            )
+            historyDao.insertHistory(history)
+            
+            if (status == Book.STATUS_READING || status == Book.STATUS_COMPLETED) {
+                val memo = if (status == Book.STATUS_COMPLETED) {
+                    "완독하여 독서 포트폴리오에 첫 발자국을 남겼어요! 🥳"
+                } else {
+                    "책을 읽기 시작했어요! 🌱"
+                }
+                val session = ReadingSession(
+                    bookId = bookId.toInt(),
+                    startDate = selectedDateStr,
+                    endDate = selectedDateStr,
+                    title = if (status == Book.STATUS_COMPLETED) "완독 축하!" else "독서 시작",
+                    memo = memo,
+                    rating = 5,
+                    tags = if (status == Book.STATUS_COMPLETED) "완독,성공" else "시작,독서"
+                )
+                sessionDao.insertSession(session)
+            }
+            bookId
+        }
     }
 }

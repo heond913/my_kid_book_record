@@ -459,29 +459,37 @@ fun CreateGoalBottomSheet(
                     modifier = Modifier.height(110.dp).fillMaxWidth(),
                     contentAlignment = Alignment.BottomCenter
                 ) {
-                    val displayCount = targetCountInt.coerceIn(1, 10)
+                    val maxBooks = 12
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy((-4).dp)
                     ) {
-                        for (i in 0 until displayCount) {
-                            val bookColors = listOf(
-                                Color(0xFF8B5CF6), // Warm purple
-                                Color(0xFFFFD600), // Yellow
-                                Color(0xFF4CAF50), // Green
-                                Color(0xFFEF5350), // Red
-                                Color(0xFF29B6F6)  // Blue
-                            )
-                            val bookColor = bookColors[i % bookColors.size]
-                            
-                            Card(
-                                shape = RoundedCornerShape(4.dp),
-                                colors = CardDefaults.cardColors(containerColor = bookColor),
-                                border = BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.15f)),
-                                modifier = Modifier
-                                    .width((60 + (i * 3.5)).dp)
-                                    .height(10.dp)
-                            ) {}
+                        for (h in maxBooks - 1 downTo 0) {
+                            val isVisible = h < targetCountInt.coerceAtMost(maxBooks)
+                            AnimatedVisibility(
+                                visible = isVisible,
+                                enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                                exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
+                            ) {
+                                val bookColors = listOf(
+                                    Color(0xFF8B5CF6), // Warm purple
+                                    Color(0xFFFFD600), // Yellow
+                                    Color(0xFF4CAF50), // Green
+                                    Color(0xFFEF5350), // Red
+                                    Color(0xFF29B6F6)  // Blue
+                                )
+                                val bookColor = bookColors[h % bookColors.size]
+                                val widthDp = (110.0 - h * 4.5).coerceAtLeast(50.0).toFloat().dp
+                                
+                                Card(
+                                    shape = RoundedCornerShape(3.dp),
+                                    colors = CardDefaults.cardColors(containerColor = bookColor),
+                                    border = BorderStroke(0.5.dp, Color.Black.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .width(widthDp)
+                                        .height(10.dp)
+                                ) {}
+                            }
                         }
                     }
                 }
@@ -549,8 +557,12 @@ fun CreateGoalBottomSheet(
                 }
             }
 
-            // 3. Month or Quarter selection (Horizontal scrollable chips)
-            if (periodType == "MONTHLY") {
+            // 3. Month or Quarter selection (Horizontal scrollable chips) with smooth AnimatedVisibility to prevent Layout Shift
+            AnimatedVisibility(
+                visible = periodType == "MONTHLY",
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -581,7 +593,13 @@ fun CreateGoalBottomSheet(
                         }
                     }
                 }
-            } else if (periodType == "QUARTERLY") {
+            }
+
+            AnimatedVisibility(
+                visible = periodType == "QUARTERLY",
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -637,8 +655,8 @@ fun CreateGoalBottomSheet(
                         onClick = { if (targetCountInt > 1) targetCountInt-- },
                         modifier = Modifier
                             .size(56.dp)
-                            .background(Color(0xFFFFF9C4), CircleShape) // Light yellow round stepper
-                            .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f), CircleShape)
+                            .background(Color(0xFFF3E8FF), CircleShape) // Light lavender background for stepper
+                            .border(1.dp, Color(0xFFD8B4FE), CircleShape) // Cohesive lavender border
                     ) {
                         Icon(
                             imageVector = Icons.Default.Remove,
@@ -663,8 +681,8 @@ fun CreateGoalBottomSheet(
                         onClick = { if (targetCountInt < 99) targetCountInt++ },
                         modifier = Modifier
                             .size(56.dp)
-                            .background(Color(0xFFFFF9C4), CircleShape)
-                            .border(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f), CircleShape)
+                            .background(Color(0xFFF3E8FF), CircleShape) // Light lavender background for stepper
+                            .border(1.dp, Color(0xFFD8B4FE), CircleShape) // Cohesive lavender border
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -718,8 +736,8 @@ fun GoalTypeChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) Color(0xFF8B5CF6) else Color(0xFFFFF9C4)) // Purple selection vs Warm light yellow background
-            .border(1.dp, if (isSelected) Color(0xFF8B5CF6) else Color(0xFF8B5CF6).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+            .background(if (isSelected) Color(0xFF8B5CF6) else Color(0xFFF5F5F4)) // Purple selection vs Neutral light gray background
+            .border(1.dp, if (isSelected) Color(0xFF8B5CF6) else Color(0xFFE7E5E4), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center

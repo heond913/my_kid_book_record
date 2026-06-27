@@ -66,7 +66,7 @@ fun HomeScreen(
     }
 
     var calendar by remember { mutableStateOf(Calendar.getInstance()) }
-    var selectedDate by remember { mutableStateOf(Calendar.getInstance().apply { time = Date() }) }
+    val selectedDate by viewModel.selectedDate.collectAsState()
 
     // Header State
     val yearMonthFormat = SimpleDateFormat("yyyy년 M월", Locale.KOREAN)
@@ -307,7 +307,7 @@ fun HomeScreen(
                                             books = books,
                                             modifier = Modifier.weight(1f),
                                             onClick = {
-                                                selectedDate = date.clone() as Calendar
+                                                viewModel.setSelectedDate(date.clone() as Calendar)
                                             }
                                         )
                                     }

@@ -39,6 +39,18 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val _childNameState = MutableStateFlow(getChildName())
     val childNameState: StateFlow<String> = _childNameState.asStateFlow()
 
+    private val _selectedDate = MutableStateFlow<Calendar>(Calendar.getInstance().apply { time = Date() })
+    val selectedDate: StateFlow<Calendar> = _selectedDate.asStateFlow()
+
+    fun setSelectedDate(calendar: Calendar) {
+        _selectedDate.value = calendar
+    }
+
+    fun getFormattedDate(calendar: Calendar): String {
+        val sdf = SimpleDateFormat("yy/MM/dd", Locale.getDefault())
+        return sdf.format(calendar.time)
+    }
+
     private val _childGenderState = MutableStateFlow(getChildGender())
     val childGenderState: StateFlow<String> = _childGenderState.asStateFlow()
 
@@ -323,7 +335,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         isbn: String,
         category: String,
         coverUrl: String? = null,
-        status: String = Book.STATUS_WANT_TO_READ,
+        status: String = Book.STATUS_READING,
         onSuccess: (Int) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -338,18 +350,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 status = status,
                 childName = getChildName()
             )
-            val id = repository.insertBook(book).toInt()
-            
-            // Log status history initial state
-            val today = getFormattedToday()
-            repository.insertHistory(
-                StatusHistory(
-                    bookId = id,
-                    fromStatus = "등록",
-                    toStatus = status,
-                    changeDate = today
-                )
-            )
+            val selectedDateStr = getFormattedDate(_selectedDate.value)
+            val id = repository.insertBookWithSessionAndHistory(book, status, selectedDateStr).toInt()
             onSuccess(id)
         }
     }
@@ -597,16 +599,30 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Utility calculations for Reports & Dashboard ---
 
+    private fun isSameMonth(dateStr: String, monthValue: String): Boolean {
+        // monthValue: "yyyy-MM" (e.g., "2026-06")
+        val date = parseDateString(dateStr) ?: return false
+        val calDate = Calendar.getInstance().apply { time = date }
+        
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+            val targetDate = sdf.parse(monthValue) ?: return false
+            val calTarget = Calendar.getInstance().apply { time = targetDate }
+            calDate.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
+                    calDate.get(Calendar.MONTH) == calTarget.get(Calendar.MONTH)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun getMonthStats(monthValue: String): MonthStats {
         // monthValue: "YYYY-MM" (e.g., "2026-06")
         val currentBooks = books.value
         val currentSessions = sessions.value
 
         // Filter sessions occurring in this month
-        // In session, dates are saved as "26/06/03" or "2026-06-03". Let's parse both formats.
         val monthSessions = currentSessions.filter {
-            val dateStr = it.startDate
-            dateStr.contains(monthValue.substring(2)) || dateStr.contains(monthValue)
+            isSameMonth(it.startDate, monthValue)
         }
 
         // 1. Reading days (독서일 수): Number of unique dates read
@@ -638,7 +654,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         val currentSessions = sessions.value
 
         val monthBookIds = currentSessions.filter {
-            it.startDate.contains(monthValue.substring(2)) || it.startDate.contains(monthValue)
+            isSameMonth(it.startDate, monthValue)
         }.map { it.bookId }.toSet()
 
         val booksToAnalyze = currentBooks.filter { monthBookIds.contains(it.id) }
@@ -672,13 +688,13 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
             
             // Sessions in this month
             val monthSessCount = currentSessions.filter {
-                it.startDate.contains(monthKey.substring(2)) || it.startDate.contains(monthKey)
+                isSameMonth(it.startDate, monthKey)
             }.size
 
             // Completed books in this month
             val monthCompCount = currentBooks.filter { book ->
                 book.status == Book.STATUS_COMPLETED && (
-                    currentSessions.any { it.bookId == book.id && (it.startDate.contains(monthKey.substring(2)) || it.startDate.contains(monthKey)) } ||
+                    currentSessions.any { it.bookId == book.id && isSameMonth(it.startDate, monthKey) } ||
                     formatTimestamp(book.addedTimestamp, "yyyy-MM") == monthKey
                 )
             }.size

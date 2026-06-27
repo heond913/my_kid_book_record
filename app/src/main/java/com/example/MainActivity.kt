@@ -511,8 +511,13 @@ fun MainTabsScreen(
                                                 fontSize = 13.sp
                                             )
                                             if (profile.birthDate.isNotEmpty()) {
+                                                val displayText = if (profile.birthDate.length == 8 && profile.birthDate.all { it.isDigit() }) {
+                                                    "${profile.birthDate.substring(0, 4)}.${profile.birthDate.substring(4, 6)}.${profile.birthDate.substring(6, 8)}"
+                                                } else {
+                                                    profile.birthDate
+                                                }
                                                 Text(
-                                                    text = profile.birthDate,
+                                                    text = displayText,
                                                     fontSize = 11.sp,
                                                     color = Color(0xFF78716C),
                                                     modifier = Modifier

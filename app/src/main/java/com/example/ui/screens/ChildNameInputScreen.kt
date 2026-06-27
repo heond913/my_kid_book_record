@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,7 +60,7 @@ fun ChildNameInputScreen(
     initialGender: String = "BOY",
     initialPhotoUri: String = "",
     initialColorHex: String = "#8B5CF6",
-    initialBirthDate: String = "2018년생",
+    initialBirthDate: String = "",
     isNewProfile: Boolean = false,
     onBack: () -> Unit,
     onComplete: ((name: String, gender: String, photoUri: String) -> Unit)? = null,
@@ -70,7 +71,7 @@ fun ChildNameInputScreen(
     var gender by remember { mutableStateOf(initialGender) } // "BOY" or "GIRL"
     var photoUri by remember { mutableStateOf(initialPhotoUri) }
     var colorHex by remember { mutableStateOf(initialColorHex) }
-    var birthDate by remember { mutableStateOf(initialBirthDate.ifEmpty { "2018년생" }) }
+    var birthDate by remember { mutableStateOf(initialBirthDate) }
 
     // Uri chosen by the system photo picker, before we crop it
     var imageToCrop by remember { mutableStateOf<Uri?>(null) }
@@ -100,7 +101,7 @@ fun ChildNameInputScreen(
     val lightPurple = activeColor.copy(alpha = 0.3f) // Disabled light purple
 
     // Button states animation
-    val isEnabled = name.isNotBlank()
+    val isEnabled = name.isNotBlank() && birthDate.length == 8
     val buttonBgColor by animateColorAsState(
         targetValue = if (isEnabled) activeColor else lightPurple,
         animationSpec = tween(durationMillis = 300),
@@ -313,9 +314,9 @@ fun ChildNameInputScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 4.1. Birthdate Selection Row Scroll (Wheel Scroller)
+            // 4.1. Birthdate Input Field
             Text(
-                text = "우리 아이 생년월일/나이 선택",
+                text = "우리 아이 생년월일 입력 (8자리)",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
@@ -325,42 +326,72 @@ fun ChildNameInputScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            androidx.compose.foundation.lazy.LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val birthYears = (2012..2026).map { "${it}년생" }
-                items(birthYears.size) { index ->
-                    val year = birthYears[index]
-                    val isSelected = year == birthDate
-                    Card(
-                        modifier = Modifier
-                            .width(90.dp)
-                            .height(44.dp)
-                            .clickable { birthDate = year },
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) activeColor else Color.White
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isSelected) activeColor else textColor.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = year,
-                                fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else textColor
+            OutlinedTextField(
+                value = birthDate,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }
+                    if (filtered.length <= 8) {
+                        birthDate = filtered
+                    }
+                },
+                placeholder = {
+                    Text(
+                        text = "예) 20200506",
+                        color = textColor.copy(alpha = 0.4f),
+                        fontSize = 15.sp
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = activeColor,
+                    unfocusedBorderColor = textColor.copy(alpha = 0.15f),
+                    focusedTextColor = textColor,
+                    unfocusedTextColor = textColor,
+                    cursorColor = activeColor
+                ),
+                trailingIcon = {
+                    if (birthDate.isNotEmpty()) {
+                        IconButton(onClick = { birthDate = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "입력 지우기",
+                                tint = textColor.copy(alpha = 0.4f)
                             )
                         }
                     }
-                }
-            }
+                },
+                supportingText = {
+                    if (birthDate.isNotEmpty() && birthDate.length < 8) {
+                        Text(
+                            text = "8자리 숫자로 입력해주세요 (현재 ${birthDate.length}자리)",
+                            color = Color.Red,
+                            fontSize = 12.sp
+                        )
+                    } else if (birthDate.length == 8) {
+                        Text(
+                            text = "올바른 8자리 생년월일입니다 ✨",
+                            color = Color(0xFF10B981),
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "생년월일 8자리를 입력해야 프로필을 등록할 수 있습니다.",
+                            color = textColor.copy(alpha = 0.5f),
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("child_birthdate_input")
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

@@ -60,7 +60,7 @@ fun AddBookScreen(
     var isbn by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("동화") }
     var coverUrl by remember { mutableStateOf("") }
-    var initialStatus by remember { mutableStateOf(Book.STATUS_WANT_TO_READ) }
+    var initialStatus by remember { mutableStateOf(Book.STATUS_READING) }
 
     // Dropdown state for category selection
     var categoryExpanded by remember { mutableStateOf(false) }
@@ -612,7 +612,6 @@ fun AddBookScreen(
                             .background(Color.Transparent)
                     ) {
                         val options = listOf(
-                            Pair(Book.STATUS_WANT_TO_READ, "읽고 싶은 책"),
                             Pair(Book.STATUS_READING, "읽는 중"),
                             Pair(Book.STATUS_COMPLETED, "완독")
                         )

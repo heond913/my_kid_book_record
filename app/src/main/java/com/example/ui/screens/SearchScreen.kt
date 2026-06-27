@@ -534,7 +534,6 @@ fun SearchScreen(
                         ) {
                             val statusList = listOf(
                                 null to "전체 상태",
-                                Book.STATUS_WANT_TO_READ to "읽고싶은",
                                 Book.STATUS_READING to "읽는 중",
                                 Book.STATUS_COMPLETED to "완독"
                             )
@@ -904,7 +903,7 @@ fun SearchScreen(
                                                     isbn = safeIsbn,
                                                     category = result.category.ifEmpty { "창작그림책" },
                                                     coverUrl = result.coverUrl,
-                                                    status = Book.STATUS_WANT_TO_READ,
+                                                    status = Book.STATUS_READING,
                                                     onSuccess = { insertedId ->
                                                         onNavigateToBookDetail(insertedId)
                                                     }
