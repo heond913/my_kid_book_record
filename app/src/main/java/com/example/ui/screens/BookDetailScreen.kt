@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,9 @@ fun BookDetailScreen(
     val photos by viewModel.selectedBookPhotos.collectAsState()
     val history by viewModel.selectedBookHistory.collectAsState()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
     var showAddSessionDialog by remember { mutableStateOf(false) }
     var selectedViewerPhoto by remember { mutableStateOf<BookPhoto?>(null) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -77,6 +81,7 @@ fun BookDetailScreen(
     val activeBook = book!!
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("독서 성장 포트폴리오", fontWeight = FontWeight.Bold) },
@@ -86,8 +91,28 @@ fun BookDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showDeleteConfirmDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "도서 삭제", tint = MaterialTheme.colorScheme.error)
+                    var showMenu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "더보기")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("도서 전체 삭제", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                showDeleteConfirmDialog = true
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "삭제",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -255,15 +280,56 @@ fun BookDetailScreen(
                                     Card(
                                         shape = RoundedCornerShape(12.dp),
                                         colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            containerColor = Color(0xFFF5F5F4)
                                         )
                                     ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        Box(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                         ) {
-                                            Text(text = log.changeDate, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(text = statusKorean, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            Column(
+                                                modifier = Modifier.padding(end = 16.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Text(
+                                                    text = log.changeDate,
+                                                    fontSize = 11.sp,
+                                                    color = Color.Gray
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = statusKorean,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF44403C)
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    viewModel.deleteHistory(log)
+                                                    coroutineScope.launch {
+                                                        val result = snackbarHostState.showSnackbar(
+                                                            message = "이력이 삭제되었습니다.",
+                                                            actionLabel = "실행 취소",
+                                                            duration = SnackbarDuration.Short
+                                                        )
+                                                        if (result == SnackbarResult.ActionPerformed) {
+                                                            viewModel.insertHistory(log)
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .offset(x = 6.dp, y = (-4).dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "이력 삭제",
+                                                    tint = Color.Gray,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
 

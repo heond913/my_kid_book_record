@@ -53,6 +53,9 @@ class BookRepository(private val database: AppDatabase) {
     suspend fun insertHistory(history: StatusHistory): Long = 
         historyDao.insertHistory(history)
 
+    suspend fun deleteHistory(history: StatusHistory) = 
+        historyDao.deleteHistory(history)
+
     fun getGoalForPeriod(type: String, value: String): Flow<ReadingGoal?> = 
         goalDao.getGoalForPeriod(type, value)
 

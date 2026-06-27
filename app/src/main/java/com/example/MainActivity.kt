@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +63,42 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 1. Check if we launched because of an uncaught exception
+        val errorExtra = intent?.getStringExtra("KEY_ERROR_MSG")
+        if (errorExtra != null) {
+            setContent {
+                MyApplicationTheme {
+                    ErrorFallbackScreen(
+                        errorMsg = errorExtra,
+                        onReset = {
+                            clearAppDataAndRestart()
+                        }
+                    )
+                }
+            }
+            return
+        }
+
+        // 2. Set default uncaught exception handler to prevent hard crashes and show standard Error Screen
+        val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val errorDetails = "Error: ${throwable.localizedMessage ?: throwable.toString()}\n\n" +
+                        throwable.stackTrace.take(15).joinToString("\n") { "  at ${it.className}.${it.methodName}(${it.fileName}:${it.lineNumber})" }
+                
+                val intent = android.content.Intent(this, MainActivity::class.java).apply {
+                    putExtra("KEY_ERROR_MSG", errorDetails)
+                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
+                startActivity(intent)
+                android.os.Process.killProcess(android.os.Process.myPid())
+                java.lang.System.exit(10)
+            } catch (e: Exception) {
+                originalHandler?.uncaughtException(thread, throwable)
+            }
+        }
+
         setContent {
             MyApplicationTheme {
                 // Initialize the single ViewModel using our factory pattern
@@ -73,6 +111,35 @@ class MainActivity : ComponentActivity() {
                     navController = navController
                 )
             }
+        }
+    }
+
+    private fun clearAppDataAndRestart() {
+        try {
+            // Delete the database file
+            deleteDatabase("kids_book_journal_db")
+            
+            // Clear SharedPreferences
+            getSharedPreferences("book_journal_prefs", android.content.Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+                
+            // Restart the app normally
+            val intent = android.content.Intent(this, MainActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            startActivity(intent)
+            android.os.Process.killProcess(android.os.Process.myPid())
+            java.lang.System.exit(0)
+        } catch (e: Exception) {
+            // Fallback: just restart normally
+            val intent = android.content.Intent(this, MainActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            startActivity(intent)
+            android.os.Process.killProcess(android.os.Process.myPid())
+            java.lang.System.exit(0)
         }
     }
 }
@@ -530,3 +597,150 @@ fun MainTabsScreen(
         }
     }
 }
+
+@Composable
+fun ErrorFallbackScreen(
+    errorMsg: String,
+    onReset: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    
+    val backgroundColor = Color(0xFFFDFCF0) // Cream background
+    val textColor = Color(0xFF44403C) // Dark brown text
+    val errorAccent = Color(0xFFEF4444) // Friendly Red
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(24.dp)
+            .testTag("error_fallback_screen"),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+        ) {
+            // Cute animated-looking construction / warning emoji
+            Text(
+                text = "🚧 🐞 🚧",
+                fontSize = 48.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Text(
+                text = "앗! 앱에 문제가 발생했어요",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = textColor,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Text(
+                text = "아이의 데이터나 프로필 정보 처리 도중 예상치 못한 오류가 발견되었습니다. 앱을 초기화하거나 안전하게 다시 작동시켜보세요.",
+                fontSize = 14.sp,
+                color = textColor.copy(alpha = 0.7f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            // Scrollable error details Card
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                border = BorderStroke(1.dp, textColor.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                ) {
+                    Text(
+                        text = errorMsg,
+                        fontSize = 11.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = Color(0xFFEF4444)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Action Buttons
+            Button(
+                onClick = onReset,
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = errorAccent,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("reset_and_restart_button")
+            ) {
+                Text(
+                    text = "데이터 초기화 및 다시 시작",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedButton(
+                onClick = {
+                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(errorMsg))
+                    android.widget.Toast.makeText(context, "오류 로그가 클립보드에 복사되었습니다! 📋", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = textColor
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("copy_error_log_button")
+            ) {
+                Text(
+                    text = "오류 상세 정보 복사하기",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            TextButton(
+                onClick = {
+                    // Just trigger a normal restart
+                    val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    }
+                    context.startActivity(intent)
+                    (context as? android.app.Activity)?.finish()
+                },
+                modifier = Modifier.testTag("just_restart_button")
+            ) {
+                Text(
+                    text = "그냥 다시 시도해보기",
+                    color = textColor.copy(alpha = 0.6f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+

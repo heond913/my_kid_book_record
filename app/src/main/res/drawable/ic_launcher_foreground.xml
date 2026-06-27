@@ -1,46 +1,8 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    
-    <!-- Open Book Left Page -->
-    <path
-        android:fillColor="#FF6F00"
-        android:pathData="M 54,72 C 45,70 32,68 22,72 L 22,38 C 32,34 45,36 54,38 Z" />
-        
-    <!-- Open Book Right Page -->
-    <path
-        android:fillColor="#FF8F00"
-        android:pathData="M 54,72 C 63,70 76,68 86,72 L 86,38 C 76,34 63,36 54,38 Z" />
-        
-    <!-- Left Inner Page Overlay (White) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M 52,70 C 44,68 33,66 24,70 L 24,40 C 33,36 44,38 52,40 Z" />
-        
-    <!-- Right Inner Page Overlay (White) -->
-    <path
-        android:fillColor="#FFFDE7"
-        android:pathData="M 56,70 C 64,68 75,66 84,70 L 84,40 C 75,36 64,38 56,40 Z" />
-
-    <!-- Book Spine Ribbon / Bookmark (Pink/Heart) -->
-    <path
-        android:fillColor="#E91E63"
-        android:pathData="M 52,38 L 56,38 L 56,74 L 54,71 L 52,74 Z" />
-
-    <!-- Glowing Heart above the Book -->
-    <path
-        android:fillColor="#E91E63"
-        android:pathData="M 54,30 C 54,30 50,26 50,23 C 50,20.5 51.5,19 54,21 C 56.5,19 58,20.5 58,23 C 58,26 54,30 54,30 Z" />
-
-    <!-- Little Shining Star Left -->
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M 36,32 L 38,34 L 36,36 L 34,34 Z" />
-
-    <!-- Little Shining Star Right -->
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M 72,28 L 74,30 L 72,32 L 70,30 Z" />
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="100dp"
+        android:height="100dp"
+        android:drawable="@drawable/app_icon_custom"
+        android:gravity="center" />
+</layer-list>

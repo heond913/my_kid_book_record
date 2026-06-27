@@ -382,6 +382,18 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteHistory(history: StatusHistory) {
+        viewModelScope.launch {
+            repository.deleteHistory(history)
+        }
+    }
+
+    fun insertHistory(history: StatusHistory) {
+        viewModelScope.launch {
+            repository.insertHistory(history)
+        }
+    }
+
     // --- Reading Session Operations ---
 
     fun addReadingSession(

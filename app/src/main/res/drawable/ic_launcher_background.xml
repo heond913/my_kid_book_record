@@ -15,22 +15,12 @@
                 android:startY="0"
                 android:type="linear">
                 <item
-                    android:color="#FFF9C4"
+                    android:color="#E1F5FE"
                     android:offset="0.0" />
                 <item
-                    android:color="#FFD180"
+                    android:color="#B3E5FC"
                     android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Beautiful organic bubble pattern for children's interest -->
-    <path
-        android:fillColor="#10FFFFFF"
-        android:pathData="M15,20 A10,10 0 1,1 15,40 A10,10 0 1,1 15,20" />
-    <path
-        android:fillColor="#15FFFFFF"
-        android:pathData="M90,75 A15,15 0 1,1 90,105 A15,15 0 1,1 90,75" />
-    <path
-        android:fillColor="#10FFFFFF"
-        android:pathData="M80,25 A8,8 0 1,1 80,41 A8,8 0 1,1 80,25" />
 </vector>
