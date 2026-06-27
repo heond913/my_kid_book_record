@@ -3,6 +3,7 @@ package com.example.data.repository
 import android.util.Log
 import com.example.data.api.BookSearchCoordinator
 import com.example.data.api.BookSearchResult
+import com.example.data.api.SearchMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -23,7 +24,7 @@ class BookSearchRepository {
     /**
      * 외부 API(Google Books) 및 Gemini AI 통합 검색을 수행하고 안전한 도서 검색 결과를 보장합니다.
      */
-    suspend fun performUnifiedSearch(query: String, searchMode: String = "ALL"): List<BookSearchResult> = 
+    suspend fun performUnifiedSearch(query: String, searchMode: SearchMode = SearchMode.ALL): List<BookSearchResult> = 
         withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Executing unified book search in repository for query: $query, mode: $searchMode")

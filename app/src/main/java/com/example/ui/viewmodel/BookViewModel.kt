@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.api.BookSearchResult
+import com.example.data.api.SearchMode
 import com.example.data.model.*
 import com.example.data.db.AppDatabase
 import com.example.data.repository.BookRepository
@@ -47,9 +48,9 @@ class BookViewModel(
 ) : AndroidViewModel(application) {
 
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
-    private val searchCache = mutableMapOf<Pair<String, String>, List<BookSearchResult>>()
+    private val searchCache = mutableMapOf<Pair<String, SearchMode>, List<BookSearchResult>>()
     var lastQuery: String = ""
-    var lastSearchMode: String = "ALL"
+    var lastSearchMode: SearchMode = SearchMode.ALL
     var lastSearchQuery: String = ""
     var lastSearchTab: String = "MY_LIBRARY"
 
@@ -511,7 +512,7 @@ class BookViewModel(
 
     // --- Book Catalog Search ---
 
-    fun performExternalSearch(query: String, searchMode: String = "ALL") {
+    fun performExternalSearch(query: String, searchMode: SearchMode = SearchMode.ALL) {
         if (query.isBlank()) {
             _searchUiState.value = SearchUiState.Idle
             return
@@ -551,7 +552,7 @@ class BookViewModel(
         }
     }
 
-    fun restoreSearchResults(query: String, searchMode: String = "ALL") {
+    fun restoreSearchResults(query: String, searchMode: SearchMode = SearchMode.ALL) {
         if (query.isBlank()) {
             _searchUiState.value = SearchUiState.Idle
             return

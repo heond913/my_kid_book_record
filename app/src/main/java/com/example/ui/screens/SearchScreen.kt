@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Book
 import com.example.data.api.BookSearchResult
+import com.example.data.api.SearchMode
 import com.example.ui.viewmodel.BookViewModel
 import java.util.UUID
 
@@ -290,7 +291,7 @@ fun SearchScreen(
                         onClick = {
                             if (searchQuery.isNotBlank()) {
                                 if (selectedTabStr == "ONLINE_SEARCH") {
-                                    viewModel.performExternalSearch(searchQuery, "ALL")
+                                    viewModel.performExternalSearch(searchQuery, SearchMode.ALL)
                                 } else {
                                     viewModel.addRecentSearch(searchQuery)
                                 }
@@ -326,7 +327,7 @@ fun SearchScreen(
                     onSearch = {
                         if (searchQuery.isNotBlank()) {
                             if (selectedTabStr == "ONLINE_SEARCH") {
-                                viewModel.performExternalSearch(searchQuery, "ALL")
+                                viewModel.performExternalSearch(searchQuery, SearchMode.ALL)
                             } else {
                                 viewModel.addRecentSearch(searchQuery)
                             }
@@ -425,7 +426,7 @@ fun SearchScreen(
                                 onClick = {
                                     searchQuery = query
                                     if (selectedTabStr == "ONLINE_SEARCH") {
-                                        viewModel.performExternalSearch(query, "ALL")
+                                        viewModel.performExternalSearch(query, SearchMode.ALL)
                                     } else {
                                         viewModel.addRecentSearch(query)
                                     }

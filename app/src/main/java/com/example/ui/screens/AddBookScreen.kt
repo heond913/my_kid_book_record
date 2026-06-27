@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.api.BookSearchResult
+import com.example.data.api.SearchMode
 import com.example.data.model.Book
 import com.example.ui.viewmodel.BookViewModel
 
@@ -50,7 +51,7 @@ fun AddBookScreen(
 
     var activeTab by remember { mutableStateOf(0) } // 0 = Search Online, 1 = Manual Input
     var searchQuery by remember { mutableStateOf("") }
-    var searchMode by remember { mutableStateOf("ALL") } // "ALL" = Standard, "AI" = Gemini
+    var searchMode by remember { mutableStateOf(SearchMode.ALL) } // "ALL" = Standard, "AI" = Gemini
 
     // Manual Form States
     var title by remember { mutableStateOf("") }
@@ -290,8 +291,8 @@ fun AddBookScreen(
                     ) {
                         Button(
                             onClick = { 
-                                searchMode = "ALL"
-                                viewModel.performExternalSearch(searchQuery, "ALL")
+                                searchMode = SearchMode.ALL
+                                viewModel.performExternalSearch(searchQuery, SearchMode.ALL)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = darkBrownColor, contentColor = Color.White),
                             modifier = Modifier.weight(1f),
@@ -302,8 +303,8 @@ fun AddBookScreen(
 
                         Button(
                             onClick = { 
-                                searchMode = "AI"
-                                viewModel.performExternalSearch(searchQuery, "AI")
+                                searchMode = SearchMode.AI
+                                viewModel.performExternalSearch(searchQuery, SearchMode.AI)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = brandPurpleColor, contentColor = Color.White),
                             modifier = Modifier.weight(1f),
@@ -337,7 +338,7 @@ fun AddBookScreen(
                                 CircularProgressIndicator(color = brandPurpleColor)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = if (searchMode == "AI") "🤖 AI가 똑똑하게 어린이 도서 데이터를 분석하는 중..." else "온라인 도서 정보 검색 중...",
+                                    text = if (searchMode == SearchMode.AI) "🤖 AI가 똑똑하게 어린이 도서 데이터를 분석하는 중..." else "온라인 도서 정보 검색 중...",
                                     fontSize = 13.sp,
                                     color = darkBrownColor.copy(alpha = 0.7f)
                                 )
@@ -737,7 +738,7 @@ fun AddBookScreen(
                         isbn = scannedIsbn
                         if (activeTab == 0) {
                             searchQuery = scannedIsbn
-                            viewModel.performExternalSearch(scannedIsbn, "ALL")
+                            viewModel.performExternalSearch(scannedIsbn, SearchMode.ALL)
                         }
                     }
                 )

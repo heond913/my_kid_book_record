@@ -160,90 +160,108 @@ object BookSearchCoordinator {
         results
     }
 
-    suspend fun performUnifiedSearch(query: String, searchMode: String = "ALL"): List<BookSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun performUnifiedSearch(query: String, searchMode: SearchMode = SearchMode.ALL): List<BookSearchResult> = withContext(Dispatchers.IO) {
         Log.d(TAG, "performUnifiedSearch query: $query, mode: $searchMode")
         val startTime = System.currentTimeMillis()
         
-        if (searchMode == "AI") {
-            val results = mutableListOf<BookSearchResult>()
-            val timeoutMs = 10000L
-            try {
-                kotlinx.coroutines.withTimeout(timeoutMs) {
-                    val geminiRes = searchWithGemini(query, startTime = startTime, timeoutMs = timeoutMs)
-                    results.addAll(geminiRes)
-                }
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                Log.w(TAG, "performUnifiedSearch [AI Mode] timed out after ${timeoutMs}ms.")
-            } catch (e: Exception) {
-                Log.e(TAG, "performUnifiedSearch: Gemini AI search failed.", e)
-            }
-            
-            return@withContext if (results.isNotEmpty()) {
-                results
-            } else {
-                Log.w(TAG, "performUnifiedSearch [AI Mode] returned empty results. Using local fallback.")
+        when (searchMode) {
+            SearchMode.LOCAL -> {
                 getLocalFallbackResults(query)
             }
-        }
-        
-        // ALL Mode
-        val timeoutMs = 5000L
-        val combinedResults = mutableListOf<BookSearchResult>()
-        
-        try {
-            kotlinx.coroutines.withTimeout(timeoutMs) {
-                val googleResults = try {
-                    searchGoogleBooks(query, startTime, timeoutMs)
-                } catch (e: Exception) {
-                    Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback.", e)
-                    emptyList()
-                }
-                combinedResults.addAll(googleResults)
-                
-                val elapsed = System.currentTimeMillis() - startTime
-                val remaining = timeoutMs - elapsed
-                
-                if (combinedResults.size < 30 && remaining > 500) {
-                    Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini.")
-                    val geminiResults = try {
-                        searchWithGemini(query, startTime, timeoutMs)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed.", e)
-                        emptyList()
+            SearchMode.GOOGLE -> {
+                val timeoutMs = 5000L
+                val results = mutableListOf<BookSearchResult>()
+                try {
+                    kotlinx.coroutines.withTimeout(timeoutMs) {
+                        val googleResults = searchGoogleBooks(query, startTime, timeoutMs)
+                        results.addAll(googleResults)
                     }
-                    
-                    val processedTitles = combinedResults.map { it.title.trim().lowercase() }.toMutableSet()
-                    val processedIsbns = combinedResults.map { it.isbn.trim() }.filter { it.isNotEmpty() }.toMutableSet()
-                    
-                    for (book in geminiResults) {
-                        if (combinedResults.size >= 30) break
-                        val titleKey = book.title.trim().lowercase()
-                        val isbnKey = book.isbn.trim()
+                } catch (e: Exception) {
+                    Log.e(TAG, "performUnifiedSearch [GOOGLE Mode] failed or timed out.", e)
+                }
+                if (results.isNotEmpty()) results else getLocalFallbackResults(query)
+            }
+            SearchMode.AI -> {
+                val results = mutableListOf<BookSearchResult>()
+                val timeoutMs = 10000L
+                try {
+                    kotlinx.coroutines.withTimeout(timeoutMs) {
+                        val geminiRes = searchWithGemini(query, startTime = startTime, timeoutMs = timeoutMs)
+                        results.addAll(geminiRes)
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    Log.w(TAG, "performUnifiedSearch [AI Mode] timed out after ${timeoutMs}ms.")
+                } catch (e: Exception) {
+                    Log.e(TAG, "performUnifiedSearch: Gemini AI search failed.", e)
+                }
+                
+                if (results.isNotEmpty()) {
+                    results
+                } else {
+                    Log.w(TAG, "performUnifiedSearch [AI Mode] returned empty results. Using local fallback.")
+                    getLocalFallbackResults(query)
+                }
+            }
+            SearchMode.ALL -> {
+                val timeoutMs = 5000L
+                val combinedResults = mutableListOf<BookSearchResult>()
+                
+                try {
+                    kotlinx.coroutines.withTimeout(timeoutMs) {
+                        val googleResults = try {
+                            searchGoogleBooks(query, startTime, timeoutMs)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "performUnifiedSearch: Google Books API call failed. Proceeding with fallback.", e)
+                            emptyList()
+                        }
+                        combinedResults.addAll(googleResults)
                         
-                        val isDuplicateTitle = processedTitles.contains(titleKey)
-                        val isDuplicateIsbn = isbnKey.isNotEmpty() && processedIsbns.contains(isbnKey)
+                        val elapsed = System.currentTimeMillis() - startTime
+                        val remaining = timeoutMs - elapsed
                         
-                        if (!isDuplicateTitle && !isDuplicateIsbn) {
-                            combinedResults.add(book)
-                            processedTitles.add(titleKey)
-                            if (isbnKey.isNotEmpty()) {
-                                processedIsbns.add(isbnKey)
+                        if (combinedResults.size < 30 && remaining > 500) {
+                            Log.d(TAG, "performUnifiedSearch: Google Books returned ${combinedResults.size} results (< 30). Triggering Gemini.")
+                            val geminiResults = try {
+                                searchWithGemini(query, startTime, timeoutMs)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "performUnifiedSearch: Gemini supplement search failed.", e)
+                                emptyList()
+                            }
+                            
+                            val processedTitles = combinedResults.map { it.title.trim().lowercase() }.toMutableSet()
+                            val processedIsbns = combinedResults.map { it.isbn.trim() }.filter { it.isNotEmpty() }.toMutableSet()
+                            
+                            for (book in geminiResults) {
+                                if (combinedResults.size >= 30) break
+                                val titleKey = book.title.trim().lowercase()
+                                val isbnKey = book.isbn.trim()
+                                
+                                val isDuplicateTitle = processedTitles.contains(titleKey)
+                                val isDuplicateIsbn = isbnKey.isNotEmpty() && processedIsbns.contains(isbnKey)
+                                
+                                if (!isDuplicateTitle && !isDuplicateIsbn) {
+                                    combinedResults.add(book)
+                                    processedTitles.add(titleKey)
+                                    if (isbnKey.isNotEmpty()) {
+                                        processedIsbns.add(isbnKey)
+                                    }
+                                }
                             }
                         }
                     }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    Log.w(TAG, "performUnifiedSearch [ALL Mode] timed out after ${timeoutMs}ms.")
+                } catch (e: Exception) {
+                    Log.e(TAG, "performUnifiedSearch: Search failed.", e)
+                }
+                
+                if (combinedResults.isNotEmpty()) {
+                    combinedResults.take(30)
+                } else {
+                    Log.w(TAG, "performUnifiedSearch: Both APIs failed or returned empty. Falling back to local fallback dataset.")
+                    getLocalFallbackResults(query)
                 }
             }
-        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            Log.w(TAG, "performUnifiedSearch [ALL Mode] timed out after ${timeoutMs}ms.")
-        } catch (e: Exception) {
-            Log.e(TAG, "performUnifiedSearch: Search failed.", e)
         }
-        
-        if (combinedResults.isNotEmpty()) {
-            return@withContext combinedResults.take(30)
-        }
-        
-        Log.w(TAG, "performUnifiedSearch: Both APIs failed or returned empty. Falling back to local fallback dataset.")
-        getLocalFallbackResults(query)
     }
 }

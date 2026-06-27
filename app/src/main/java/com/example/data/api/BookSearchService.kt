@@ -11,6 +11,13 @@ data class BookSearchResult(
     val description: String = ""
 )
 
+enum class SearchMode {
+    ALL,      // Google Books + Gemini 통합 검색
+    GOOGLE,   // Google Books 단독 검색
+    AI,       // Gemini 문맥 추천 검색
+    LOCAL     // 오프라인 Fallback 더미 데이터셋 검색
+}
+
 object BookSearchService {
     
     fun getLocalFallbackResults(query: String): List<BookSearchResult> {
@@ -35,7 +42,7 @@ object BookSearchService {
 
     suspend fun performUnifiedSearch(
         query: String,
-        searchMode: String = "ALL"
+        searchMode: SearchMode = SearchMode.ALL
     ): List<BookSearchResult> {
         return BookSearchCoordinator.performUnifiedSearch(query, searchMode)
     }
