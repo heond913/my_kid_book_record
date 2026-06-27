@@ -481,7 +481,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Reading Goal Operations ---
 
-    fun setReadingGoal(periodType: String, periodValue: String, targetCount: Int) {
+    fun setReadingGoal(periodType: String, periodValue: String, targetCount: Int, reward: String = "") {
         viewModelScope.launch {
             val currentChild = getChildName()
             val existing = goals.value.find { it.periodType == periodType && it.periodValue == periodValue }
@@ -490,7 +490,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 periodType = periodType,
                 periodValue = periodValue,
                 targetCount = targetCount,
-                childName = currentChild
+                childName = currentChild,
+                reward = reward
             )
             repository.insertGoal(goal)
         }

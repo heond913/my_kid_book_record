@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.*
@@ -280,8 +281,8 @@ fun GoalScreen(
             if (showCreateGoalDialog) {
                 CreateGoalBottomSheet(
                     onDismiss = { showCreateGoalDialog = false },
-                    onSubmit = { type, value, count ->
-                        viewModel.setReadingGoal(type, value, count)
+                    onSubmit = { type, value, count, reward ->
+                        viewModel.setReadingGoal(type, value, count, reward)
                         showCreateGoalDialog = false
                     }
                 )
@@ -405,6 +406,24 @@ fun GoalProgressCard(
                     )
                 }
             }
+
+            if (!goal.reward.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFFFF9C4)) // Pastel light yellow
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎁 약속한 달성 보상: ${goal.reward}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100)
+                    )
+                }
+            }
         }
     }
 }
@@ -413,10 +432,11 @@ fun GoalProgressCard(
 @Composable
 fun CreateGoalBottomSheet(
     onDismiss: () -> Unit,
-    onSubmit: (type: String, value: String, count: Int) -> Unit
+    onSubmit: (type: String, value: String, count: Int, reward: String) -> Unit
 ) {
     var periodType by remember { mutableStateOf("MONTHLY") } // "MONTHLY", "QUARTERLY", "YEARLY"
     var targetCountInt by remember { mutableStateOf(5) }
+    var rewardText by remember { mutableStateOf("") }
 
     val cal = Calendar.getInstance()
     val currentYear = cal.get(Calendar.YEAR)
@@ -434,21 +454,36 @@ fun CreateGoalBottomSheet(
         containerColor = Color(0xFFFDFCF0), // Match cream background perfectly!
         contentColor = Color(0xFF44403C)
     ) {
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 36.dp, top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "독서 습관 목표 추가",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 18.sp,
-                color = Color(0xFF44403C),
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.padding(bottom = 8.dp)
-            )
+            ) {
+                Text(
+                    text = "🌱 엄마와 함께하는 우리 아이 독서 습관 만들기",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color(0xFF8B5CF6),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "새로운 독서 목표 추가하기",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF44403C),
+                    textAlign = TextAlign.Center
+                )
+            }
 
             // Dynamic interactive book stack illustration (visual "책이 쌓이는 시각적 효과")
             Column(
@@ -694,7 +729,35 @@ fun CreateGoalBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 5. Reward Setting Section
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "🎁 목표 달성 시 보상 설정",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF44403C)
+                )
+                OutlinedTextField(
+                    value = rewardText,
+                    onValueChange = { rewardText = it },
+                    placeholder = { Text("예: 원하는 책 사주기, 놀이공원 가기 🎡", fontSize = 13.sp) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF8B5CF6),
+                        unfocusedBorderColor = Color(0xFF44403C).copy(alpha = 0.2f),
+                        focusedLabelColor = Color(0xFF8B5CF6)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = {
@@ -703,7 +766,7 @@ fun CreateGoalBottomSheet(
                         "QUARTERLY" -> "$selectedYear-$selectedQuarter"
                         else -> selectedYear
                     }
-                    onSubmit(periodType, periodValue, targetCountInt)
+                    onSubmit(periodType, periodValue, targetCountInt, rewardText)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

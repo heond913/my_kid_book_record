@@ -75,5 +75,6 @@ data class ReadingGoal(
     val periodValue: String, // Format: "YYYY-MM" (Monthly), "YYYY-QX" (Quarterly), "YYYY" (Yearly)
     val targetCount: Int,
     val timestamp: Long = System.currentTimeMillis(),
-    val childName: String = ""
+    val childName: String = "",
+    val reward: String = ""
 )
