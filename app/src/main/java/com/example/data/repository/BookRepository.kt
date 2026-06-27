@@ -4,6 +4,8 @@ import androidx.room.withTransaction
 import com.example.data.db.*
 import com.example.data.model.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class BookRepository(private val database: AppDatabase) {
     private val bookDao = database.bookDao()
@@ -16,22 +18,24 @@ class BookRepository(private val database: AppDatabase) {
     val allSessions: Flow<List<ReadingSession>> = sessionDao.getAllSessions()
     val allGoals: Flow<List<ReadingGoal>> = goalDao.getAllGoals()
 
-    suspend fun getBookById(id: Int): Book? = bookDao.getBookById(id)
+    suspend fun getBookById(id: Int): Book? = withContext(Dispatchers.IO) { bookDao.getBookById(id) }
 
-    suspend fun insertBook(book: Book): Long = bookDao.insertBook(book)
+    suspend fun insertBook(book: Book): Long = withContext(Dispatchers.IO) { bookDao.insertBook(book) }
 
-    suspend fun updateBook(book: Book) = bookDao.updateBook(book)
+    suspend fun updateBook(book: Book) = withContext(Dispatchers.IO) { bookDao.updateBook(book) }
 
-    suspend fun deleteBook(book: Book) = bookDao.deleteBook(book)
+    suspend fun deleteBook(book: Book) = withContext(Dispatchers.IO) { bookDao.deleteBook(book) }
 
     fun getSessionsForBook(bookId: Int): Flow<List<ReadingSession>> = 
         sessionDao.getSessionsForBook(bookId)
 
-    suspend fun insertSession(session: ReadingSession): Long = 
+    suspend fun insertSession(session: ReadingSession): Long = withContext(Dispatchers.IO) {
         sessionDao.insertSession(session)
+    }
 
-    suspend fun deleteSession(session: ReadingSession) = 
+    suspend fun deleteSession(session: ReadingSession) = withContext(Dispatchers.IO) {
         sessionDao.deleteSession(session)
+    }
 
     fun getPhotosForBook(bookId: Int): Flow<List<BookPhoto>> = 
         photoDao.getPhotosForBook(bookId)
@@ -39,37 +43,44 @@ class BookRepository(private val database: AppDatabase) {
     fun getPhotosForSession(sessionId: Int): Flow<List<BookPhoto>> = 
         photoDao.getPhotosForSession(sessionId)
 
-    suspend fun insertPhoto(photo: BookPhoto): Long = 
+    suspend fun insertPhoto(photo: BookPhoto): Long = withContext(Dispatchers.IO) {
         photoDao.insertPhoto(photo)
+    }
 
-    suspend fun updatePhoto(photo: BookPhoto) = 
+    suspend fun updatePhoto(photo: BookPhoto) = withContext(Dispatchers.IO) {
         photoDao.updatePhoto(photo)
+    }
 
-    suspend fun deletePhoto(photo: BookPhoto) = 
+    suspend fun deletePhoto(photo: BookPhoto) = withContext(Dispatchers.IO) {
         photoDao.deletePhoto(photo)
+    }
 
     fun getHistoryForBook(bookId: Int): Flow<List<StatusHistory>> = 
         historyDao.getHistoryForBook(bookId)
 
-    suspend fun insertHistory(history: StatusHistory): Long = 
+    suspend fun insertHistory(history: StatusHistory): Long = withContext(Dispatchers.IO) {
         historyDao.insertHistory(history)
+    }
 
-    suspend fun deleteHistory(history: StatusHistory) = 
+    suspend fun deleteHistory(history: StatusHistory) = withContext(Dispatchers.IO) {
         historyDao.deleteHistory(history)
+    }
 
     fun getGoalForPeriod(type: String, value: String): Flow<ReadingGoal?> = 
         goalDao.getGoalForPeriod(type, value)
 
-    suspend fun insertGoal(goal: ReadingGoal): Long = 
+    suspend fun insertGoal(goal: ReadingGoal): Long = withContext(Dispatchers.IO) {
         goalDao.insertGoal(goal)
+    }
 
-    suspend fun deleteGoal(goal: ReadingGoal) = 
+    suspend fun deleteGoal(goal: ReadingGoal) = withContext(Dispatchers.IO) {
         goalDao.deleteGoal(goal)
+    }
 
     /**
      * Updates a book's status and automatically registers status-change history logs.
      */
-    suspend fun updateBookStatus(bookId: Int, newStatus: String, changeDate: String) {
+    suspend fun updateBookStatus(bookId: Int, newStatus: String, changeDate: String) = withContext(Dispatchers.IO) {
         database.withTransaction {
             val book = bookDao.getBookById(bookId) ?: return@withTransaction
             val oldStatus = book.status
@@ -95,8 +106,8 @@ class BookRepository(private val database: AppDatabase) {
         book: Book,
         status: String,
         selectedDateStr: String
-    ): Long {
-        return database.withTransaction {
+    ): Long = withContext(Dispatchers.IO) {
+        database.withTransaction {
             val bookId = bookDao.insertBook(book)
             
             val history = StatusHistory(
