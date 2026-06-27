@@ -33,6 +33,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val searchCache = mutableMapOf<Pair<String, String>, List<BookSearchResult>>()
     var lastQuery: String = ""
     var lastSearchMode: String = "ALL"
+    var lastSearchQuery: String = ""
+    var lastSearchTab: String = "MY_LIBRARY"
 
     private val _childNameState = MutableStateFlow(getChildName())
     val childNameState: StateFlow<String> = _childNameState.asStateFlow()
@@ -42,6 +44,12 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _childPhotoUriState = MutableStateFlow(getChildPhotoUri())
     val childPhotoUriState: StateFlow<String> = _childPhotoUriState.asStateFlow()
+
+    private val _childColorHexState = MutableStateFlow(getChildColorHex())
+    val childColorHexState: StateFlow<String> = _childColorHexState.asStateFlow()
+
+    private val _profilesState = MutableStateFlow(getProfiles())
+    val profilesState: StateFlow<List<ChildProfile>> = _profilesState.asStateFlow()
 
     fun getChildName(): String {
         return sharedPrefs.getString("child_name", "") ?: ""
@@ -70,6 +78,145 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         _childPhotoUriState.value = uri
     }
 
+    fun getChildColorHex(): String {
+        return sharedPrefs.getString("child_color_hex", "#8B5CF6") ?: "#8B5CF6"
+    }
+
+    fun setChildColorHex(colorHex: String) {
+        sharedPrefs.edit().putString("child_color_hex", colorHex).apply()
+        _childColorHexState.value = colorHex
+    }
+
+    fun getProfiles(): List<ChildProfile> {
+        val jsonStr = sharedPrefs.getString("child_profiles_list", null)
+        if (jsonStr.isNullOrEmpty()) {
+            val currentName = getChildName()
+            if (currentName.isNotEmpty()) {
+                val defaultProfile = ChildProfile(
+                    name = currentName,
+                    gender = getChildGender(),
+                    photoUri = getChildPhotoUri(),
+                    colorHex = getChildColorHex()
+                )
+                val list = listOf(defaultProfile)
+                val array = org.json.JSONArray().apply {
+                    val obj = org.json.JSONObject().apply {
+                        put("name", defaultProfile.name)
+                        put("gender", defaultProfile.gender)
+                        put("photoUri", defaultProfile.photoUri)
+                        put("colorHex", defaultProfile.colorHex)
+                        put("birthDate", defaultProfile.birthDate)
+                    }
+                    put(obj)
+                }
+                sharedPrefs.edit().putString("child_profiles_list", array.toString()).apply()
+                return list
+            }
+            return emptyList()
+        }
+        
+        val list = mutableListOf<ChildProfile>()
+        try {
+            val array = org.json.JSONArray(jsonStr)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    ChildProfile(
+                        name = obj.optString("name", ""),
+                        gender = obj.optString("gender", "BOY"),
+                        photoUri = obj.optString("photoUri", ""),
+                        colorHex = obj.optString("colorHex", "#8B5CF6"),
+                        birthDate = obj.optString("birthDate", "")
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    fun saveProfiles(profiles: List<ChildProfile>) {
+        val array = org.json.JSONArray()
+        for (profile in profiles) {
+            val obj = org.json.JSONObject().apply {
+                put("name", profile.name)
+                put("gender", profile.gender)
+                put("photoUri", profile.photoUri)
+                put("colorHex", profile.colorHex)
+                put("birthDate", profile.birthDate)
+            }
+            array.put(obj)
+        }
+        sharedPrefs.edit().putString("child_profiles_list", array.toString()).apply()
+        _profilesState.value = profiles
+    }
+
+    fun addProfile(profile: ChildProfile) {
+        val currentList = getProfiles().toMutableList()
+        currentList.removeAll { it.name == profile.name }
+        currentList.add(profile)
+        saveProfiles(currentList)
+        switchProfile(profile)
+    }
+
+    fun switchProfile(profile: ChildProfile) {
+        sharedPrefs.edit().apply {
+            putString("child_name", profile.name)
+            putString("child_gender", profile.gender)
+            putString("child_photo_uri", profile.photoUri)
+            putString("child_color_hex", profile.colorHex)
+            apply()
+        }
+        _childNameState.value = profile.name
+        _childGenderState.value = profile.gender
+        _childPhotoUriState.value = profile.photoUri
+        _childColorHexState.value = profile.colorHex
+    }
+
+    fun switchProfileByName(name: String) {
+        val profile = getProfiles().find { it.name == name }
+        if (profile != null) {
+            switchProfile(profile)
+        }
+    }
+
+    fun deleteProfile(name: String) {
+        val currentList = getProfiles().toMutableList()
+        currentList.removeAll { it.name == name }
+        saveProfiles(currentList)
+        if (_childNameState.value == name) {
+            val first = currentList.firstOrNull()
+            if (first != null) {
+                switchProfile(first)
+            } else {
+                sharedPrefs.edit().apply {
+                    putString("child_name", "")
+                    putString("child_gender", "")
+                    putString("child_photo_uri", "")
+                    putString("child_color_hex", "#8B5CF6")
+                    apply()
+                }
+                _childNameState.value = ""
+                _childGenderState.value = ""
+                _childPhotoUriState.value = ""
+                _childColorHexState.value = "#8B5CF6"
+            }
+        }
+    }
+
+    fun updateProfile(oldName: String, updatedProfile: ChildProfile) {
+        val currentList = getProfiles().toMutableList()
+        val index = currentList.indexOfFirst { it.name == oldName }
+        if (index != -1) {
+            currentList[index] = updatedProfile
+            saveProfiles(currentList)
+            if (_childNameState.value == oldName) {
+                switchProfile(updatedProfile)
+            }
+        }
+    }
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = BookRepository(database)
@@ -77,12 +224,28 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- State Streams ---
     val books: StateFlow<List<Book>> = repository.allBooks
+        .combine(childNameState) { allBooks, currentChildName ->
+            allBooks.filter { book ->
+                book.childName == currentChildName || book.childName.isEmpty()
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val sessions: StateFlow<List<ReadingSession>> = repository.allSessions
+        .combine(books) { allSessions, currentBooks ->
+            val bookIds = currentBooks.map { it.id }.toSet()
+            allSessions.filter { session ->
+                bookIds.contains(session.bookId)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val goals: StateFlow<List<ReadingGoal>> = repository.allGoals
+        .combine(childNameState) { allGoals, currentChildName ->
+            allGoals.filter { goal ->
+                goal.childName == currentChildName || goal.childName.isEmpty()
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Search States ---
@@ -172,7 +335,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 isbn = isbn,
                 category = category,
                 coverUrl = coverUrl,
-                status = status
+                status = status,
+                childName = getChildName()
             )
             val id = repository.insertBook(book).toInt()
             
@@ -304,13 +468,14 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setReadingGoal(periodType: String, periodValue: String, targetCount: Int) {
         viewModelScope.launch {
-            val existingFlow = repository.getGoalForPeriod(periodType, periodValue)
-            val existing = existingFlow.firstOrNull()
+            val currentChild = getChildName()
+            val existing = goals.value.find { it.periodType == periodType && it.periodValue == periodValue }
             val goal = ReadingGoal(
                 id = existing?.id ?: 0,
                 periodType = periodType,
                 periodValue = periodValue,
-                targetCount = targetCount
+                targetCount = targetCount,
+                childName = currentChild
             )
             repository.insertGoal(goal)
         }

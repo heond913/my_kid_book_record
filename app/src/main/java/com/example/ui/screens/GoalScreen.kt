@@ -118,7 +118,7 @@ fun GoalScreen(
                         .size(56.dp)
                         .shadow(elevation = 6.dp, shape = CircleShape)
                         .background(
-                            if (childPhotoUri.isNotEmpty()) Color.Transparent
+                            if (childPhotoUri.isNotEmpty() && !childPhotoUri.startsWith("emoji:")) Color.Transparent
                             else when (childGender) {
                                 "BOY" -> Color(0xFFE0F2FE)
                                 "GIRL" -> Color(0xFFFCE7F3)
@@ -140,12 +140,19 @@ fun GoalScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (childPhotoUri.isNotEmpty()) {
-                        AsyncImage(
-                            model = childPhotoUri,
-                            contentDescription = "아이 프로필",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
+                        if (childPhotoUri.startsWith("emoji:")) {
+                            Text(
+                                text = childPhotoUri.removePrefix("emoji:"),
+                                fontSize = 28.sp
+                            )
+                        } else {
+                            AsyncImage(
+                                model = childPhotoUri,
+                                contentDescription = "아이 프로필",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        }
                     } else {
                         Icon(
                             imageVector = Icons.Default.ChildCare,

@@ -680,6 +680,45 @@ fun AddSessionDialog(
     var rating by remember { mutableStateOf(5) }
     var tags by remember { mutableStateOf("") }
 
+    val calendar = Calendar.getInstance()
+    fun showDatePicker(isStartDate: Boolean) {
+        val currentDateStr = if (isStartDate) startDate else endDate
+        var year = calendar.get(Calendar.YEAR)
+        var month = calendar.get(Calendar.MONTH)
+        var day = calendar.get(Calendar.DAY_OF_MONTH)
+        
+        try {
+            val parts = currentDateStr.split("/")
+            if (parts.size == 3) {
+                val yy = parts[0].toInt()
+                val fullYear = if (yy < 50) 2000 + yy else 1900 + yy
+                val mm = parts[1].toInt() - 1
+                val dd = parts[2].toInt()
+                year = fullYear
+                month = mm
+                day = dd
+            }
+        } catch (e: Exception) {
+            // fallback to current date if parsing fails
+        }
+
+        android.app.DatePickerDialog(
+            context,
+            { _, selectedYear, selectedMonth, selectedDay ->
+                val yyShort = selectedYear % 100
+                val formattedDate = String.format(Locale.getDefault(), "%02d/%02d/%02d", yyShort, selectedMonth + 1, selectedDay)
+                if (isStartDate) {
+                    startDate = formattedDate
+                } else {
+                    endDate = formattedDate
+                }
+            },
+            year,
+            month,
+            day
+        ).show()
+    }
+
     // List of added photos (UriString to Purpose)
     val addedPhotos = remember { mutableStateListOf<Pair<String, String>>() }
 
@@ -749,20 +788,57 @@ fun AddSessionDialog(
             ) {
                 // Date picker inputs
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startDate,
-                        onValueChange = { startDate = it },
-                        label = { Text("시작일 (YY/MM/DD)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = endDate,
-                        onValueChange = { endDate = it },
-                        label = { Text("종료일 (YY/MM/DD)") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showDatePicker(isStartDate = true) }
+                    ) {
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = { },
+                            readOnly = true,
+                            label = { Text("시작일") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "시작일 선택"
+                                )
+                            }
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker(isStartDate = true) }
+                        )
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showDatePicker(isStartDate = false) }
+                    ) {
+                        OutlinedTextField(
+                            value = endDate,
+                            onValueChange = { },
+                            readOnly = true,
+                            label = { Text("종료일") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "종료일 선택"
+                                )
+                            }
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showDatePicker(isStartDate = false) }
+                        )
+                    }
                 }
 
                 OutlinedTextField(

@@ -14,11 +14,31 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlin.math.absoluteValue
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.data.model.ChildProfile
+import kotlinx.coroutines.flow.firstOrNull
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -88,7 +108,6 @@ fun MainAppScreenHost(
                 initialGender = initialGender,
                 initialPhotoUri = initialPhotoUri,
                 onBack = {
-                    // Pop back stack if possible, otherwise finish activity
                     if (!navController.popBackStack()) {
                         (navController.context as? android.app.Activity)?.finish()
                     }
@@ -97,9 +116,72 @@ fun MainAppScreenHost(
                     viewModel.setChildName(name)
                     viewModel.setChildGender(gender)
                     viewModel.setChildPhotoUri(photoUri)
+                    val profile = ChildProfile(
+                        name = name,
+                        gender = gender,
+                        photoUri = photoUri,
+                        colorHex = "#8B5CF6"
+                    )
+                    viewModel.addProfile(profile)
                     navController.navigate("main_tabs") {
                         popUpTo("child_name_input") { inclusive = true }
                     }
+                }
+            )
+        }
+
+        composable("add_profile") {
+            ChildNameInputScreen(
+                initialName = "",
+                initialGender = "BOY",
+                initialPhotoUri = "",
+                initialColorHex = "#8B5CF6",
+                initialBirthDate = "",
+                isNewProfile = true,
+                onBack = { navController.popBackStack() },
+                onCompleteNew = { name, gender, photoUri, colorHex, birthDate ->
+                    val profile = ChildProfile(
+                        name = name,
+                        gender = gender,
+                        photoUri = photoUri,
+                        colorHex = colorHex,
+                        birthDate = birthDate
+                    )
+                    viewModel.addProfile(profile)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = "edit_profile/{name}",
+            arguments = listOf(navArgument("name") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val name = backStackEntry.arguments?.getString("name") ?: ""
+            val profiles = viewModel.getProfiles()
+            val profile = profiles.find { it.name == name }
+            ChildNameInputScreen(
+                initialName = profile?.name ?: "",
+                initialGender = profile?.gender ?: "BOY",
+                initialPhotoUri = profile?.photoUri ?: "",
+                initialColorHex = profile?.colorHex ?: "#8B5CF6",
+                initialBirthDate = profile?.birthDate ?: "",
+                isNewProfile = false,
+                onBack = { navController.popBackStack() },
+                onProfileDelete = {
+                    viewModel.deleteProfile(name)
+                    navController.popBackStack()
+                },
+                onCompleteNew = { updatedName, gender, photoUri, colorHex, birthDate ->
+                    val updated = ChildProfile(
+                        name = updatedName,
+                        gender = gender,
+                        photoUri = photoUri,
+                        colorHex = colorHex,
+                        birthDate = birthDate
+                    )
+                    viewModel.updateProfile(name, updated)
+                    navController.popBackStack()
                 }
             )
         }
@@ -115,7 +197,7 @@ fun MainAppScreenHost(
                     navController.navigate("add_book")
                 },
                 onNavigateToProfile = {
-                    navController.navigate("child_name_input")
+                    // Handled inside MainTabsScreen via bottom sheet
                 }
             )
         }
@@ -146,7 +228,7 @@ fun MainAppScreenHost(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MainTabsScreen(
     viewModel: BookViewModel,
@@ -157,6 +239,7 @@ fun MainTabsScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 4 })
+    var showProfileSwitcher by remember { mutableStateOf(false) }
     
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -214,20 +297,233 @@ fun MainTabsScreen(
                         onNavigateToBookDetail = onNavigateToBookDetail,
                         onNavigateToAddBook = onNavigateToAddBook,
                         onNavigateToNewSession = onNavigateToBookDetail,
-                        onNavigateToProfile = onNavigateToProfile
+                        onNavigateToProfile = { showProfileSwitcher = true }
                     )
                     1 -> ReportScreen(
                         viewModel = viewModel,
-                        onNavigateToProfile = onNavigateToProfile
+                        onNavigateToProfile = { showProfileSwitcher = true }
                     )
                     2 -> SearchScreen(
                         viewModel = viewModel,
                         onNavigateToBookDetail = onNavigateToBookDetail,
-                        onNavigateToProfile = onNavigateToProfile
+                        onNavigateToProfile = { showProfileSwitcher = true }
                     )
                     3 -> GoalScreen(
                         viewModel = viewModel,
-                        onNavigateToProfile = onNavigateToProfile
+                        onNavigateToProfile = { showProfileSwitcher = true }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showProfileSwitcher) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val profiles by viewModel.profilesState.collectAsState()
+        val currentChildName by viewModel.childNameState.collectAsState()
+        val allBooks by viewModel.books.collectAsState()
+        val allSessions by viewModel.sessions.collectAsState()
+        
+        ModalBottomSheet(
+            onDismissRequest = { showProfileSwitcher = false },
+            sheetState = sheetState,
+            containerColor = Color(0xFFFDFCF0),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFF78716C).copy(alpha = 0.4f)) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 40.dp)
+            ) {
+                Text(
+                    text = "누구의 독서기록장을 볼까요?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF44403C),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    profiles.forEach { profile ->
+                        val isSelected = profile.name == currentChildName
+                        val pColor = try {
+                            Color(android.graphics.Color.parseColor(profile.colorHex))
+                        } catch (e: Exception) {
+                            Color(0xFF8B5CF6)
+                        }
+                        
+                        // Calculate some summary information for this profile
+                        val childBooksCount = allBooks.filter { it.childName == profile.name }.size
+                        val summaryText = if (childBooksCount > 0) {
+                            "등록된 책 ${childBooksCount}권 🌱"
+                        } else {
+                            "아직 등록된 책이 없어요 🌱"
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.switchProfile(profile)
+                                    showProfileSwitcher = false
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) pColor.copy(alpha = 0.08f) else Color.White
+                            ),
+                            border = BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) pColor else Color(0xFFE2E8F0)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .shadow(elevation = 2.dp, shape = CircleShape)
+                                            .background(
+                                                if (profile.photoUri.isNotEmpty() && !profile.photoUri.startsWith("emoji:")) Color.Transparent
+                                                else when (profile.gender) {
+                                                    "BOY" -> Color(0xFFE0F2FE)
+                                                    "GIRL" -> Color(0xFFFCE7F3)
+                                                    else -> Color(0xFFFFF9C4)
+                                                },
+                                                CircleShape
+                                            )
+                                            .border(2.dp, pColor, CircleShape)
+                                            .clip(CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (profile.photoUri.isNotEmpty()) {
+                                            if (profile.photoUri.startsWith("emoji:")) {
+                                                val emoji = profile.photoUri.removePrefix("emoji:")
+                                                Text(text = emoji, fontSize = 24.sp)
+                                            } else {
+                                                AsyncImage(
+                                                    model = profile.photoUri,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = if (profile.gender == "BOY") "👦🏻" else "👧🏻",
+                                                fontSize = 24.sp
+                                            )
+                                        }
+                                    }
+
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = profile.name,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF44403C)
+                                            )
+                                            Text(
+                                                text = if (profile.gender == "BOY") "👦🏻" else "👧🏻",
+                                                fontSize = 13.sp
+                                            )
+                                            if (profile.birthDate.isNotEmpty()) {
+                                                Text(
+                                                    text = profile.birthDate,
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFF78716C),
+                                                    modifier = Modifier
+                                                        .background(Color(0xFFF1F0E8), RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = summaryText,
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF78716C)
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            showProfileSwitcher = false
+                                            navController.navigate("edit_profile/${profile.name}")
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "프로필 수정",
+                                            tint = Color(0xFF78716C),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "선택됨",
+                                            tint = pColor,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        showProfileSwitcher = false
+                        navController.navigate("add_profile")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFF44403C)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "새 프로필 등록",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

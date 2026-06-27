@@ -14,7 +14,8 @@ data class Book(
     val category: String, // e.g. "동화", "과학", "역사", "문학", "기타"
     val coverUrl: String? = null,
     val status: String = STATUS_WANT_TO_READ,
-    val addedTimestamp: Long = System.currentTimeMillis()
+    val addedTimestamp: Long = System.currentTimeMillis(),
+    val childName: String = ""
 ) {
     companion object {
         const val STATUS_WANT_TO_READ = "WANT_TO_READ"
@@ -73,5 +74,6 @@ data class ReadingGoal(
     val periodType: String, // "MONTHLY", "QUARTERLY", "YEARLY"
     val periodValue: String, // Format: "YYYY-MM" (Monthly), "YYYY-QX" (Quarterly), "YYYY" (Yearly)
     val targetCount: Int,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val childName: String = ""
 )

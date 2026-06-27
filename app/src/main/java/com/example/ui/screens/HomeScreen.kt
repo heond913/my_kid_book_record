@@ -144,7 +144,7 @@ fun HomeScreen(
                             .size(56.dp)
                             .shadow(elevation = 6.dp, shape = CircleShape)
                             .background(
-                                if (childPhotoUri.isNotEmpty()) Color.Transparent
+                                if (childPhotoUri.isNotEmpty() && !childPhotoUri.startsWith("emoji:")) Color.Transparent
                                 else when (childGender) {
                                     "BOY" -> Color(0xFFE0F2FE) // Soft boy blue
                                     "GIRL" -> Color(0xFFFCE7F3) // Soft girl pink
@@ -166,12 +166,19 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (childPhotoUri.isNotEmpty()) {
-                            AsyncImage(
-                                model = childPhotoUri,
-                                contentDescription = "아이 프로필",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                            )
+                            if (childPhotoUri.startsWith("emoji:")) {
+                                Text(
+                                    text = childPhotoUri.removePrefix("emoji:"),
+                                    fontSize = 28.sp
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = childPhotoUri,
+                                    contentDescription = "아이 프로필",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
+                            }
                         } else {
                             Icon(
                                 imageVector = Icons.Default.ChildCare,
@@ -226,7 +233,7 @@ fun HomeScreen(
                                 text = currentMonthLabel,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = Color(0xFF44403C)
                             )
 
                             IconButton(
@@ -302,6 +309,65 @@ fun HomeScreen(
                                             onClick = {
                                                 selectedDate = date.clone() as Calendar
                                             }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Divider below the last row of the calendar
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Detailed Reading Record of Selected Date in a wide card format
+                        val headerDateStr = SimpleDateFormat("M월 d일 (E)", Locale.KOREAN).format(selectedDate.time)
+                        Text(
+                            text = "$headerDateStr 독서 기록",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF44403C),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        if (selectedSessions.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "🌱 이 날은 아직 독서 기록이 없어요.",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "자녀와 함께 책을 읽고 따뜻한 첫 기록을 남겨보세요!",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        } else {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                selectedSessions.forEach { session ->
+                                    val associatedBook = books.find { it.id == session.bookId }
+                                    if (associatedBook != null) {
+                                        ReadingSessionItemCard(
+                                            session = session,
+                                            book = associatedBook,
+                                            onClick = { onNavigateToBookDetail(associatedBook.id) }
                                         )
                                     }
                                 }
@@ -555,94 +621,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Day Sessions Title
-            item {
-                val headerDateStr = SimpleDateFormat("M월 d일 (E)", Locale.KOREAN).format(selectedDate.time)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = "오늘 읽은 기록",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "$headerDateStr 독서 기록",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            }
 
-            // 6. Day Sessions List
-            if (selectedSessions.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .shadow(4.dp, CircleShape)
-                                    .background(Color(0xFFFFF9C4), CircleShape), // Soft warm yellow background
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Book,
-                                    contentDescription = null,
-                                    tint = Color(0xFF8B5CF6), // Warm purple book icon
-                                    modifier = Modifier.size(36.dp)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .align(Alignment.BottomEnd)
-                                        .background(Color(0xFF8B5CF6), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFD600),
-                                        modifier = Modifier.size(10.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "오늘 읽은 책 기록이 없어요.\n자녀와 함께 책을 읽고 첫 기록을 남겨보세요!",
-                                textAlign = TextAlign.Center,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(selectedSessions) { session ->
-                    val associatedBook = books.find { it.id == session.bookId }
-                    if (associatedBook != null) {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            ReadingSessionItemCard(
-                                session = session,
-                                book = associatedBook,
-                                onClick = { onNavigateToBookDetail(associatedBook.id) }
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -673,10 +652,9 @@ fun CalendarDayCell(
     }
 
     val borderStroke = when {
-        isSelected -> BorderStroke(2.dp, Color(0xFF8B5CF6)) // Warm purple border for selection
+        isSelected -> BorderStroke(1.5.dp, Color(0xFF8B5CF6)) // Warm purple border for selection
         isToday -> BorderStroke(1.5.dp, Color(0xFFFFD600)) // Warm yellow border for today
-        sessions.isNotEmpty() -> BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.2f))
-        else -> BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        else -> BorderStroke(1.5.dp, Color.Transparent) // fallback transparent border of exact same width to avoid shift
     }
 
     val textColor = when {
@@ -693,14 +671,7 @@ fun CalendarDayCell(
             containerColor = cellBackground
         ),
         border = borderStroke,
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = when {
-                isSelected -> 3.dp
-                sessions.isNotEmpty() -> 1.5.dp
-                isToday -> 2.dp
-                else -> 0.dp
-            }
-        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), // flat style avoids shift
         onClick = onClick
     ) {
         Box(
@@ -734,7 +705,7 @@ fun CalendarDayCell(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(4.dp)
+                    .padding(2.dp)
             ) {
                 Text(
                     text = dayOfMonth.toString(),
@@ -746,12 +717,10 @@ fun CalendarDayCell(
 
                 if (sessions.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    // Tiny elegant purple reading dot
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF8B5CF6))
+                    // Cute little sprout badge 🌱
+                    Text(
+                        text = "🌱",
+                        fontSize = 10.sp
                     )
                 }
             }
@@ -885,6 +854,10 @@ fun generateCalendarDays(calendar: Calendar): List<Calendar?> {
         val c = calendar.clone() as Calendar
         c.set(Calendar.DAY_OF_MONTH, day)
         list.add(c)
+    }
+    // Pad the end with nulls to make it a perfect multiple of 7
+    while (list.size % 7 != 0) {
+        list.add(null)
     }
     return list
 }

@@ -58,12 +58,19 @@ fun ChildNameInputScreen(
     initialName: String = "",
     initialGender: String = "BOY",
     initialPhotoUri: String = "",
+    initialColorHex: String = "#8B5CF6",
+    initialBirthDate: String = "2018년생",
+    isNewProfile: Boolean = false,
     onBack: () -> Unit,
-    onComplete: (name: String, gender: String, photoUri: String) -> Unit
+    onComplete: ((name: String, gender: String, photoUri: String) -> Unit)? = null,
+    onCompleteNew: ((name: String, gender: String, photoUri: String, colorHex: String, birthDate: String) -> Unit)? = null,
+    onProfileDelete: (() -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(initialName) }
     var gender by remember { mutableStateOf(initialGender) } // "BOY" or "GIRL"
     var photoUri by remember { mutableStateOf(initialPhotoUri) }
+    var colorHex by remember { mutableStateOf(initialColorHex) }
+    var birthDate by remember { mutableStateOf(initialBirthDate.ifEmpty { "2018년생" }) }
 
     // Uri chosen by the system photo picker, before we crop it
     var imageToCrop by remember { mutableStateOf<Uri?>(null) }
@@ -82,13 +89,20 @@ fun ChildNameInputScreen(
     // Color definitions
     val backgroundColor = Color(0xFFFDFCF0) // Cream background
     val textColor = Color(0xFF44403C) // Dark brown text
-    val warmPurple = Color(0xFF8B5CF6) // Warm purple accent
-    val lightPurple = warmPurple.copy(alpha = 0.3f) // Disabled light purple
+    
+    val activeColor = remember(colorHex) {
+        try {
+            Color(android.graphics.Color.parseColor(colorHex))
+        } catch (e: Exception) {
+            Color(0xFF8B5CF6)
+        }
+    }
+    val lightPurple = activeColor.copy(alpha = 0.3f) // Disabled light purple
 
     // Button states animation
     val isEnabled = name.isNotBlank()
     val buttonBgColor by animateColorAsState(
-        targetValue = if (isEnabled) warmPurple else lightPurple,
+        targetValue = if (isEnabled) activeColor else lightPurple,
         animationSpec = tween(durationMillis = 300),
         label = "buttonBgColor"
     )
@@ -162,7 +176,7 @@ fun ChildNameInputScreen(
                     .size(110.dp)
                     .shadow(elevation = 6.dp, shape = CircleShape)
                     .background(
-                        if (photoUri.isNotEmpty()) Color.Transparent
+                        if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) Color.Transparent
                         else when (gender) {
                             "BOY" -> Color(0xFFE0F2FE) // Soft boy blue background
                             "GIRL" -> Color(0xFFFCE7F3) // Soft girl pink background
@@ -172,11 +186,7 @@ fun ChildNameInputScreen(
                     )
                     .border(
                         3.dp,
-                        when (gender) {
-                            "BOY" -> Color(0xFF0284C7)
-                            "GIRL" -> Color(0xFFDB2777)
-                            else -> Color(0xFF8B5CF6)
-                        },
+                        activeColor,
                         CircleShape
                     )
                     .clip(CircleShape)
@@ -188,12 +198,20 @@ fun ChildNameInputScreen(
                 contentAlignment = Alignment.Center
             ) {
                 if (photoUri.isNotEmpty()) {
-                    AsyncImage(
-                        model = photoUri,
-                        contentDescription = "아이 사진 미리보기",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                    if (photoUri.startsWith("emoji:")) {
+                        val emoji = photoUri.removePrefix("emoji:")
+                        Text(
+                            text = emoji,
+                            fontSize = 52.sp
+                        )
+                    } else {
+                        AsyncImage(
+                            model = photoUri,
+                            contentDescription = "아이 사진 미리보기",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 } else {
                     Text(
                         text = if (gender == "BOY") "👦🏻" else "👧🏻",
@@ -229,7 +247,7 @@ fun ChildNameInputScreen(
 
             // 3. Headline Title text
             Text(
-                text = "반가워요, 엄마!\n첫 기록을 시작할\n우리 아이의 이름은?",
+                text = if (isNewProfile) "새로운 우리 아이\n독서 프로필 등록하기 ✨" else "반가워요, 엄마!\n첫 기록을 시작할\n우리 아이의 이름은?",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     lineHeight = 36.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -257,11 +275,11 @@ fun ChildNameInputScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    focusedBorderColor = warmPurple,
+                    focusedBorderColor = activeColor,
                     unfocusedBorderColor = textColor.copy(alpha = 0.15f),
                     focusedTextColor = textColor,
                     unfocusedTextColor = textColor,
-                    cursorColor = warmPurple
+                    cursorColor = activeColor
                 ),
                 trailingIcon = {
                     if (name.isNotEmpty()) {
@@ -292,6 +310,57 @@ fun ChildNameInputScreen(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Start
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 4.1. Birthdate Selection Row Scroll (Wheel Scroller)
+            Text(
+                text = "우리 아이 생년월일/나이 선택",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val birthYears = (2012..2026).map { "${it}년생" }
+                items(birthYears.size) { index ->
+                    val year = birthYears[index]
+                    val isSelected = year == birthDate
+                    Card(
+                        modifier = Modifier
+                            .width(90.dp)
+                            .height(44.dp)
+                            .clickable { birthDate = year },
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) activeColor else Color.White
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isSelected) activeColor else textColor.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = year,
+                                fontSize = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else textColor
+                            )
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -370,9 +439,131 @@ fun ChildNameInputScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // 5.1. Accent Color Theme Picker
+            Text(
+                text = "우리 아이 고유 컬러 지정",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val colorOptions = listOf(
+                "#8B5CF6" to "보라 💜",
+                "#10B981" to "초록 💚",
+                "#3B82F6" to "파랑 💙",
+                "#F59E0B" to "노랑 💛",
+                "#EF4444" to "빨강 ❤️",
+                "#EC4899" to "핑크 🩷"
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                colorOptions.forEach { (hex, label) ->
+                    val isSelected = colorHex == hex
+                    val col = try {
+                        Color(android.graphics.Color.parseColor(hex))
+                    } catch (e: Exception) {
+                        Color(0xFF8B5CF6)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .background(
+                                color = if (isSelected) col.copy(alpha = 0.15f) else Color.White,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) col else textColor.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { colorHex = hex },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(col, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = label.takeLast(2), // Emoji
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 5.2. Cute Default Character Picker
+            Text(
+                text = "우리 아이 기본 캐릭터 선택",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val defaultCharacters = listOf(
+                    "🐼" to "팬더",
+                    "🦁" to "사자",
+                    "🐰" to "토끼",
+                    "🦊" to "여우",
+                    "🐻" to "곰",
+                    "🐥" to "병아리"
+                )
+                defaultCharacters.forEach { (charEmoji, nameLabel) ->
+                    val isSelected = photoUri == "emoji:$charEmoji"
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .background(
+                                color = if (isSelected) activeColor.copy(alpha = 0.15f) else Color.White,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) activeColor else textColor.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { photoUri = "emoji:$charEmoji" },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(text = charEmoji, fontSize = 24.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(text = nameLabel, fontSize = 10.sp, color = textColor)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // 6. Child Photo Selection
             Text(
-                text = "우리 아이 사진 추가 (선택)",
+                text = "우리 아이 사진 추가 (직접 업로드)",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
@@ -405,7 +596,7 @@ fun ChildNameInputScreen(
                         modifier = Modifier
                             .size(64.dp)
                             .background(
-                                if (photoUri.isNotEmpty()) Color.Transparent
+                                if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) Color.Transparent
                                 else when (gender) {
                                     "BOY" -> Color(0xFFE0F2FE)
                                     "GIRL" -> Color(0xFFFCE7F3)
@@ -415,17 +606,13 @@ fun ChildNameInputScreen(
                             )
                             .border(
                                 1.5.dp,
-                                when (gender) {
-                                    "BOY" -> Color(0xFF0284C7).copy(alpha = 0.4f)
-                                    "GIRL" -> Color(0xFFDB2777).copy(alpha = 0.4f)
-                                    else -> Color(0xFF8B5CF6).copy(alpha = 0.4f)
-                                },
+                                activeColor.copy(alpha = 0.4f),
                                 CircleShape
                             )
                             .clip(CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (photoUri.isNotEmpty()) {
+                        if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) {
                             AsyncImage(
                                 model = photoUri,
                                 contentDescription = "아이 사진",
@@ -436,11 +623,7 @@ fun ChildNameInputScreen(
                             Icon(
                                 imageVector = Icons.Default.PhotoCamera,
                                 contentDescription = "사진 추가",
-                                tint = when (gender) {
-                                    "BOY" -> Color(0xFF0284C7)
-                                    "GIRL" -> Color(0xFFDB2777)
-                                    else -> Color(0xFF8B5CF6)
-                                },
+                                tint = activeColor,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -450,19 +633,19 @@ fun ChildNameInputScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(
-                            text = if (photoUri.isNotEmpty()) "사진이 등록되었습니다 ✨" else "아이 사진 등록하기",
+                            text = if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) "직접 추가된 사진 ✨" else "갤러리에서 사진 등록하기",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = textColor
                         )
                         Text(
-                            text = if (photoUri.isNotEmpty()) "클릭하여 사진 크롭 및 변경" else "포트폴리오에 예쁘게 노출됩니다",
+                            text = if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) "클릭하여 사진 크롭 및 변경" else "앨범 속 사진을 직접 설정할 수 있습니다",
                             fontSize = 12.sp,
                             color = textColor.copy(alpha = 0.6f)
                         )
                     }
 
-                    if (photoUri.isNotEmpty()) {
+                    if (photoUri.isNotEmpty() && !photoUri.startsWith("emoji:")) {
                         TextButton(
                             onClick = { photoUri = "" }
                         ) {
@@ -481,7 +664,15 @@ fun ChildNameInputScreen(
 
             // 7. CTA Button with color animations
             Button(
-                onClick = { if (isEnabled) onComplete(name, gender, photoUri) },
+                onClick = {
+                    if (isEnabled) {
+                        if (onCompleteNew != null) {
+                            onCompleteNew(name, gender, photoUri, colorHex, birthDate)
+                        } else if (onComplete != null) {
+                            onComplete(name, gender, photoUri)
+                        }
+                    }
+                },
                 enabled = isEnabled,
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -501,10 +692,56 @@ fun ChildNameInputScreen(
                     .testTag("start_portfolio_button")
             ) {
                 Text(
-                    text = "포트폴리오 시작하기",
+                    text = if (isNewProfile) "새 프로필 등록 완료 ✨" else "포트폴리오 시작하기",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            if (!isNewProfile && initialName.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                var showDeleteConfirm by remember { mutableStateOf(false) }
+
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFFEF4444)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Text(
+                        text = "프로필 삭제하기",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (showDeleteConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirm = false },
+                        title = { Text("프로필 삭제") },
+                        text = { Text("정말로 '${initialName}'의 모든 기록을 삭제하고 프로필을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showDeleteConfirm = false
+                                    onProfileDelete?.invoke()
+                                }
+                            ) {
+                                Text("삭제", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirm = false }) {
+                                Text("취소")
+                            }
+                        }
+                    )
+                }
             }
         }
     }

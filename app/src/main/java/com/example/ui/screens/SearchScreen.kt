@@ -77,12 +77,26 @@ fun SearchScreen(
         }
     }
 
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(viewModel.lastSearchQuery) }
     val focusManager = LocalFocusManager.current
     var isSearchFieldFocused by remember { mutableStateOf(false) }
     
     // [요구사항 2] Bento 스타일의 모드 전환 탭(Tab) 레이아웃 도입
-    var selectedTabStr by remember { mutableStateOf("MY_LIBRARY") }
+    var selectedTabStr by remember { mutableStateOf(viewModel.lastSearchTab) }
+
+    LaunchedEffect(searchQuery) {
+        viewModel.lastSearchQuery = searchQuery
+    }
+
+    LaunchedEffect(selectedTabStr) {
+        viewModel.lastSearchTab = selectedTabStr
+    }
+
+    LaunchedEffect(Unit) {
+        if (selectedTabStr == "ONLINE_SEARCH" && searchQuery.isNotBlank()) {
+            viewModel.restoreSearchResults(searchQuery, viewModel.lastSearchMode)
+        }
+    }
 
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedStatus by remember { mutableStateOf<String?>(null) }
@@ -150,7 +164,7 @@ fun SearchScreen(
                         .size(56.dp)
                         .shadow(elevation = 6.dp, shape = CircleShape)
                         .background(
-                            if (childPhotoUri.isNotEmpty()) Color.Transparent
+                            if (childPhotoUri.isNotEmpty() && !childPhotoUri.startsWith("emoji:")) Color.Transparent
                             else when (childGender) {
                                 "BOY" -> Color(0xFFE0F2FE)
                                 "GIRL" -> Color(0xFFFCE7F3)
@@ -172,12 +186,19 @@ fun SearchScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (childPhotoUri.isNotEmpty()) {
-                        AsyncImage(
-                            model = childPhotoUri,
-                            contentDescription = "아이 프로필",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
+                        if (childPhotoUri.startsWith("emoji:")) {
+                            Text(
+                                text = childPhotoUri.removePrefix("emoji:"),
+                                fontSize = 28.sp
+                            )
+                        } else {
+                            AsyncImage(
+                                model = childPhotoUri,
+                                contentDescription = "아이 프로필",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        }
                     } else {
                         Icon(
                             imageVector = Icons.Default.ChildCare,
