@@ -8,18 +8,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.api.BookSearchResult
-import com.example.data.api.BookSearchService
-import com.example.data.db.AppDatabase
 import com.example.data.model.*
+import com.example.data.db.AppDatabase
 import com.example.data.repository.BookRepository
+import com.example.data.repository.BookSearchRepository
+import com.example.data.repository.PhotoRepository
+import com.example.data.repository.StatisticsRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
-// [요구사항 2] 상태 패러다임 전환 (Sealed Class 도입)
 // 로딩, 성공, 에러, 결과 없음 상태를 정밀하게 표현하는 검색 상태 머신 정의
 sealed interface SearchUiState {
     object Idle : SearchUiState
@@ -29,8 +28,24 @@ sealed interface SearchUiState {
     object Empty : SearchUiState
 }
 
-class BookViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: BookRepository
+/**
+ * [최종 리팩토링 리비전] BookViewModel
+ * - 책임: UI 상태 제어(UI State Management) 및 사용자 흐름 생명주기 관리 전담.
+ * - 설계 안전성 (시니어 아키텍트 코멘트):
+ *   1. 관심사 분리(SoC): 비대한 비즈니스 연산과 영속성, 외부 API 쿼리 책임을 4대 전용 레포지토리로 완전 이관했습니다.
+ *      이제 뷰모델은 UI의 프리젠테이션 로직과 비즈니스 흐름 중재(Orchestration)라는 본연의 단일 책임(SRP)에만 충실합니다.
+ *   2. 메인 스레드 안전성(Main-Safety): UI 스레드 상에서의 중복 캐싱이나 계산을 지양하고,
+ *      모든 독서 통계 및 장르 수식 분석은 [StatisticsRepository]를 통해 격리 수행됩니다.
+ *   3. 검색 트랜잭션 보호: [BookSearchRepository]를 활용해 구글 API 및 백업 Gemini 로테이션 예외를 안전하게 캡슐화합니다.
+ */
+class BookViewModel(
+    application: Application,
+    private val bookRepository: BookRepository,
+    private val searchRepository: BookSearchRepository,
+    private val statsRepository: StatisticsRepository,
+    private val photoRepository: PhotoRepository
+) : AndroidViewModel(application) {
+
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
     private val searchCache = mutableMapOf<Pair<String, String>, List<BookSearchResult>>()
     var lastQuery: String = ""
@@ -232,12 +247,11 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        repository = BookRepository(database)
+        loadRecentSearches()
     }
 
-    // --- State Streams ---
-    val books: StateFlow<List<Book>> = repository.allBooks
+    // --- Dynamic Data Observations (Reactive UI streams) ---
+    val books: StateFlow<List<Book>> = bookRepository.allBooks
         .combine(childNameState) { allBooks, currentChildName ->
             allBooks.filter { book ->
                 book.childName == currentChildName || book.childName.isEmpty()
@@ -245,7 +259,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val sessions: StateFlow<List<ReadingSession>> = repository.allSessions
+    val sessions: StateFlow<List<ReadingSession>> = bookRepository.allSessions
         .combine(books) { allSessions, currentBooks ->
             val bookIds = currentBooks.map { it.id }.toSet()
             allSessions.filter { session ->
@@ -254,7 +268,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val goals: StateFlow<List<ReadingGoal>> = repository.allGoals
+    val goals: StateFlow<List<ReadingGoal>> = bookRepository.allGoals
         .combine(childNameState) { allGoals, currentChildName ->
             allGoals.filter { goal ->
                 goal.childName == currentChildName || goal.childName.isEmpty()
@@ -266,7 +280,6 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchUiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchUiState: StateFlow<SearchUiState> = _searchUiState.asStateFlow()
 
-    // 하위 호환성 유지를 위해 searchUiState로부터 성공 결과 리스트를 추출하는 파생 흐름 정의
     val searchResults: StateFlow<List<BookSearchResult>> = _searchUiState
         .map { state ->
             when (state) {
@@ -297,33 +310,28 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     // Recent books fast access
     val fastAccessBooks: StateFlow<List<Book>> = books.map { list ->
-        list.take(5) // Fast access to last 5 books added
+        list.take(5)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    init {
-        loadRecentSearches()
-    }
-
-    // --- Repository Operations ---
+    // --- Core Operations (Delegated to specialized repositories) ---
 
     fun selectBook(bookId: Int) {
         viewModelScope.launch {
-            val book = repository.getBookById(bookId)
+            val book = bookRepository.getBookById(bookId)
             _selectedBook.value = book
             if (book != null) {
-                // Collect sessions for this book
-                repository.getSessionsForBook(bookId).collect {
+                bookRepository.getSessionsForBook(bookId).collect {
                     _selectedBookSessions.value = it
                 }
             }
         }
         viewModelScope.launch {
-            repository.getPhotosForBook(bookId).collect {
+            photoRepository.getPhotosForBook(bookId).collect {
                 _selectedBookPhotos.value = it
             }
         }
         viewModelScope.launch {
-            repository.getHistoryForBook(bookId).collect {
+            bookRepository.getHistoryForBook(bookId).collect {
                 _selectedBookHistory.value = it
             }
         }
@@ -354,14 +362,14 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 childName = getChildName()
             )
             val selectedDateStr = readingDateStr ?: getFormattedDate(_selectedDate.value)
-            val id = repository.insertBookWithSessionAndHistory(book, status, selectedDateStr).toInt()
+            val id = bookRepository.insertBookWithSessionAndHistory(book, status, selectedDateStr).toInt()
             onSuccess(id)
         }
     }
 
     fun updateBook(book: Book) {
         viewModelScope.launch {
-            repository.updateBook(book)
+            bookRepository.updateBook(book)
             if (_selectedBook.value?.id == book.id) {
                 _selectedBook.value = book
             }
@@ -371,16 +379,15 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     fun updateBookStatus(bookId: Int, newStatus: String) {
         viewModelScope.launch {
             val today = getFormattedToday()
-            repository.updateBookStatus(bookId, newStatus, today)
-            // Refresh selection
-            val updated = repository.getBookById(bookId)
+            bookRepository.updateBookStatus(bookId, newStatus, today)
+            val updated = bookRepository.getBookById(bookId)
             _selectedBook.value = updated
         }
     }
 
     fun deleteBook(book: Book) {
         viewModelScope.launch {
-            repository.deleteBook(book)
+            bookRepository.deleteBook(book)
             if (_selectedBook.value?.id == book.id) {
                 _selectedBook.value = null
             }
@@ -389,13 +396,13 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteHistory(history: StatusHistory) {
         viewModelScope.launch {
-            repository.deleteHistory(history)
+            bookRepository.deleteHistory(history)
         }
     }
 
     fun insertHistory(history: StatusHistory) {
         viewModelScope.launch {
-            repository.insertHistory(history)
+            bookRepository.insertHistory(history)
         }
     }
 
@@ -422,11 +429,10 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 rating = rating,
                 tags = tags
             )
-            val sessionId = repository.insertSession(session).toInt()
+            val sessionId = bookRepository.insertSession(session).toInt()
 
-            // Save photos
             photos.forEach { (uri, purpose) ->
-                repository.insertPhoto(
+                photoRepository.insertPhoto(
                     BookPhoto(
                         bookId = bookId,
                         sessionId = sessionId,
@@ -441,8 +447,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteReadingSession(session: ReadingSession) {
         viewModelScope.launch {
-            repository.deleteSession(session)
-            // Refresh currently selected book sessions
+            bookRepository.deleteSession(session)
             _selectedBookSessions.value = _selectedBookSessions.value.filter { it.id != session.id }
         }
     }
@@ -451,7 +456,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addGeneralBookPhoto(bookId: Int, uri: String, purpose: String, memo: String = "") {
         viewModelScope.launch {
-            repository.insertPhoto(
+            photoRepository.insertPhoto(
                 BookPhoto(
                     bookId = bookId,
                     uri = uri,
@@ -466,8 +471,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val targetPhoto = _selectedBookPhotos.value.find { it.id == photoId } ?: return@launch
             val updated = targetPhoto.copy(memo = memo, rotation = rotation)
-            repository.updatePhoto(updated)
-            // Refresh
+            photoRepository.updatePhoto(updated)
             _selectedBookPhotos.value = _selectedBookPhotos.value.map {
                 if (it.id == photoId) updated else it
             }
@@ -476,7 +480,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deletePhoto(photo: BookPhoto) {
         viewModelScope.launch {
-            repository.deletePhoto(photo)
+            photoRepository.deletePhoto(photo)
             _selectedBookPhotos.value = _selectedBookPhotos.value.filter { it.id != photo.id }
         }
     }
@@ -495,13 +499,13 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 childName = currentChild,
                 reward = reward
             )
-            repository.insertGoal(goal)
+            bookRepository.insertGoal(goal)
         }
     }
 
     fun deleteGoal(goal: ReadingGoal) {
         viewModelScope.launch {
-            repository.deleteGoal(goal)
+            bookRepository.deleteGoal(goal)
         }
     }
 
@@ -531,8 +535,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                // [요구사항 4] 통합 검색 및 에러 자동 폴백(Fallback) 단일 진입점 파이프라인 호출
-                val unifiedResults = BookSearchService.performUnifiedSearch(query, searchMode)
+                val unifiedResults = searchRepository.performUnifiedSearch(query, searchMode)
                 if (unifiedResults.isEmpty()) {
                     _searchUiState.value = SearchUiState.Empty
                 } else {
@@ -541,7 +544,6 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 Log.e("BookViewModel", "Search failure", e)
-                // [수정이 필요한 핵심 결함 사항 1] 유령 메서드 호출 제거 및 에러 상태 처리
                 _searchUiState.value = SearchUiState.Error(e.localizedMessage ?: "검색 중 알 수 없는 에러가 발생했습니다.")
             } finally {
                 _isSearching.value = false
@@ -601,195 +603,24 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putString("recent_searches", current.joinToString("||")).apply()
     }
 
-    // --- Utility calculations for Reports & Dashboard ---
+    // --- Statistics and Math Calculations (Delegated to StatisticsRepository for Main-Safety) ---
 
-    private fun isSameMonth(date: Date, monthValue: String): Boolean {
-        // monthValue: "yyyy-MM" (e.g., "2026-06")
-        val calDate = Calendar.getInstance().apply { time = date }
-        
-        return try {
-            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            val targetDate = sdf.parse(monthValue) ?: return false
-            val calTarget = Calendar.getInstance().apply { time = targetDate }
-            calDate.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
-                    calDate.get(Calendar.MONTH) == calTarget.get(Calendar.MONTH)
-        } catch (e: Exception) {
-            false
-        }
+    suspend fun getMonthStats(monthValue: String): MonthStats {
+        return statsRepository.getMonthStats(monthValue, books.value, sessions.value)
     }
 
-    suspend fun getMonthStats(monthValue: String): MonthStats = withContext(Dispatchers.Default) {
-        // monthValue: "YYYY-MM" (e.g., "2026-06")
-        val currentBooks = books.value
-        val currentSessions = sessions.value
-
-        // Filter sessions occurring in this month
-        val monthSessions = currentSessions.filter {
-            isSameMonth(it.startDate, monthValue)
-        }
-
-        // 1. Reading days (독서일 수): Number of unique dates read
-        val uniqueReadingDays = monthSessions.map { formatDate(it.startDate) }.distinct().size
-
-        // 2. Count of completed books this month
-        // A book is counted as completed this month if its current status is COMPLETED and it has a session ending this month, 
-        // or was added this month. Let's look at Book's status and completed logs.
-        val completedBooksThisMonth = currentBooks.filter { book ->
-            book.status == Book.STATUS_COMPLETED && (
-                monthSessions.any { it.bookId == book.id } || 
-                formatTimestamp(book.addedTimestamp, "yyyy-MM") == monthValue
-            )
-        }.size
-
-        // 3. Current streak (연속 독서일): Calculate current consecutive reading days up to today
-        val streak = calculateStreak(currentSessions)
-
-        MonthStats(
-            booksReadCount = completedBooksThisMonth,
-            readingDaysCount = uniqueReadingDays,
-            currentStreak = streak
-        )
+    suspend fun getCategoryPercentages(monthValue: String): Map<String, Float> {
+        return statsRepository.getCategoryPercentages(monthValue, books.value, sessions.value)
     }
 
-    suspend fun getCategoryPercentages(monthValue: String): Map<String, Float> = withContext(Dispatchers.Default) {
-        // Find categories for all books read/logged this month
-        val currentBooks = books.value
-        val currentSessions = sessions.value
-
-        val monthBookIds = currentSessions.filter {
-            isSameMonth(it.startDate, monthValue)
-        }.map { it.bookId }.toSet()
-
-        val booksToAnalyze = currentBooks.filter { monthBookIds.contains(it.id) }
-        if (booksToAnalyze.isEmpty()) {
-            return@withContext Book.CATEGORIES.associateWith { 0f }
-        }
-
-        val total = booksToAnalyze.size.toFloat()
-        val counts = booksToAnalyze.groupBy { it.category }.mapValues { it.value.size / total }
-        
-        val fullMap = mutableMapOf<String, Float>()
-        Book.CATEGORIES.forEach { cat ->
-            fullMap[cat] = counts[cat] ?: 0f
-        }
-        fullMap
-    }
-
-    suspend fun getMonthlyTrendData(): List<TrendItem> = withContext(Dispatchers.Default) {
-        // Get last 6 months trend
-        val currentSessions = sessions.value
-        val currentBooks = books.value
-
-        val format = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-        val cal = Calendar.getInstance()
-        val trendList = mutableListOf<TrendItem>()
-
-        for (i in 5 downTo 0) {
-            val tempCal = cal.clone() as Calendar
-            tempCal.add(Calendar.MONTH, -i)
-            val monthKey = format.format(tempCal.time)
-            
-            // Sessions in this month
-            val monthSessCount = currentSessions.filter {
-                isSameMonth(it.startDate, monthKey)
-            }.size
-
-            // Completed books in this month
-            val monthCompCount = currentBooks.filter { book ->
-                book.status == Book.STATUS_COMPLETED && (
-                    currentSessions.any { it.bookId == book.id && isSameMonth(it.startDate, monthKey) } ||
-                    formatTimestamp(book.addedTimestamp, "yyyy-MM") == monthKey
-                )
-            }.size
-
-            trendList.add(
-                TrendItem(
-                    monthLabel = "${tempCal.get(Calendar.MONTH) + 1}월",
-                    readingCount = monthSessCount,
-                    completedCount = monthCompCount
-                )
-            )
-        }
-        trendList
-    }
-
-    private fun calculateStreak(allSessions: List<ReadingSession>): Int {
-        if (allSessions.isEmpty()) return 0
-        
-        // Parse all unique session start dates into normalized timestamps
-        val dates = allSessions.map {
-            val cal = Calendar.getInstance().apply {
-                time = it.startDate
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            cal.time
-        }.distinct().sortedDescending()
-
-        if (dates.isEmpty()) return 0
-
-        // Check if there's reading today or yesterday to continue streak
-        val today = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.time
-
-        val yesterday = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, -1)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.time
-
-        val firstReadDate = dates.first()
-        val daysDiffToday = (today.time - firstReadDate.time) / (1000 * 60 * 60 * 24)
-
-        if (daysDiffToday > 1) {
-            // Streak broken (last reading was before yesterday)
-            return 0
-        }
-
-        var streak = 1
-        var currentDate = firstReadDate
-
-        for (i in 1 until dates.size) {
-            val nextDate = dates[i]
-            val diff = (currentDate.time - nextDate.time) / (1000 * 60 * 60 * 24)
-            if (diff == 1L) {
-                streak++
-                currentDate = nextDate
-            } else if (diff > 1L) {
-                break
-            }
-        }
-        return streak
+    suspend fun getMonthlyTrendData(): List<TrendItem> {
+        return statsRepository.getMonthlyTrendData(books.value, sessions.value)
     }
 
     // Helpers
     private fun getFormattedToday(): String {
         val sdf = SimpleDateFormat("yy/MM/dd", Locale.getDefault())
         return sdf.format(Date())
-    }
-
-    private fun parseDateString(dateStr: String): Date? {
-        val formats = listOf("yy/MM/dd", "yyyy-MM-dd", "yyyy/MM/dd", "yy-MM-dd")
-        for (f in formats) {
-            try {
-                val sdf = SimpleDateFormat(f, Locale.getDefault())
-                return sdf.parse(dateStr)
-            } catch (e: Exception) {}
-        }
-        return null
-    }
-
-    private fun formatTimestamp(timestamp: Long, pattern: String): String {
-        val sdf = SimpleDateFormat(pattern, Locale.getDefault())
-        return sdf.format(Date(timestamp))
     }
 }
 
@@ -809,8 +640,20 @@ data class TrendItem(
 class BookViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BookViewModel::class.java)) {
+            val database = AppDatabase.getDatabase(application)
+            val bookRepository = BookRepository(database)
+            val searchRepository = BookSearchRepository()
+            val statsRepository = StatisticsRepository()
+            val photoRepository = PhotoRepository(database)
+            
             @Suppress("UNCHECKED_CAST")
-            return BookViewModel(application) as T
+            return BookViewModel(
+                application,
+                bookRepository,
+                searchRepository,
+                statsRepository,
+                photoRepository
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -7,25 +7,45 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * [요구사항 1] BookRepository (도서 핵심 영속성 및 세션 라이프사이클)
+ * - 책임: 도서 정보의 CRUD, 상세조회, 독서 세션(ReadingSession)의 추가/삭제 및 목표(ReadingGoal) 영속성 전담.
+ * - 설계 안전성 (시니어 아키텍트 코멘트):
+ *   1. 트랜잭션 원자성 보장: 복합 상태 변경 작업 시 Room Database의 [withTransaction] 블록을 활용하여
+ *      도서 상태 수정과 이력 기록([StatusHistory]), 초기 독서 세션 발급을 단일 원자적 단위(Atomic Unit)로 묶습니다.
+ *      중간에 예외가 발생하더라도 자동 롤백되어 데이터 불일치(Data Inconsistency)를 사전에 차단합니다.
+ *   2. Main-Safety 보장: 모든 DB 디스크 입출력은 [Dispatchers.IO] 스레드 풀에서 안전하게 구동되어
+ *      UI 스레드의 Block(화면 멈춤/Jank) 현상을 원천 방지합니다.
+ */
 class BookRepository(private val database: AppDatabase) {
     private val bookDao = database.bookDao()
     private val sessionDao = database.sessionDao()
-    private val photoDao = database.photoDao()
     private val historyDao = database.historyDao()
     private val goalDao = database.goalDao()
 
+    // --- State Streams (Data Observation Flow) ---
     val allBooks: Flow<List<Book>> = bookDao.getAllBooks()
     val allSessions: Flow<List<ReadingSession>> = sessionDao.getAllSessions()
     val allGoals: Flow<List<ReadingGoal>> = goalDao.getAllGoals()
 
-    suspend fun getBookById(id: Int): Book? = withContext(Dispatchers.IO) { bookDao.getBookById(id) }
+    // --- Core Book DB Operations ---
+    suspend fun getBookById(id: Int): Book? = withContext(Dispatchers.IO) {
+        bookDao.getBookById(id)
+    }
 
-    suspend fun insertBook(book: Book): Long = withContext(Dispatchers.IO) { bookDao.insertBook(book) }
+    suspend fun insertBook(book: Book): Long = withContext(Dispatchers.IO) {
+        bookDao.insertBook(book)
+    }
 
-    suspend fun updateBook(book: Book) = withContext(Dispatchers.IO) { bookDao.updateBook(book) }
+    suspend fun updateBook(book: Book) = withContext(Dispatchers.IO) {
+        bookDao.updateBook(book)
+    }
 
-    suspend fun deleteBook(book: Book) = withContext(Dispatchers.IO) { bookDao.deleteBook(book) }
+    suspend fun deleteBook(book: Book) = withContext(Dispatchers.IO) {
+        bookDao.deleteBook(book)
+    }
 
+    // --- Reading Session Operations ---
     fun getSessionsForBook(bookId: Int): Flow<List<ReadingSession>> = 
         sessionDao.getSessionsForBook(bookId)
 
@@ -37,24 +57,7 @@ class BookRepository(private val database: AppDatabase) {
         sessionDao.deleteSession(session)
     }
 
-    fun getPhotosForBook(bookId: Int): Flow<List<BookPhoto>> = 
-        photoDao.getPhotosForBook(bookId)
-
-    fun getPhotosForSession(sessionId: Int): Flow<List<BookPhoto>> = 
-        photoDao.getPhotosForSession(sessionId)
-
-    suspend fun insertPhoto(photo: BookPhoto): Long = withContext(Dispatchers.IO) {
-        photoDao.insertPhoto(photo)
-    }
-
-    suspend fun updatePhoto(photo: BookPhoto) = withContext(Dispatchers.IO) {
-        photoDao.updatePhoto(photo)
-    }
-
-    suspend fun deletePhoto(photo: BookPhoto) = withContext(Dispatchers.IO) {
-        photoDao.deletePhoto(photo)
-    }
-
+    // --- History Log Operations ---
     fun getHistoryForBook(bookId: Int): Flow<List<StatusHistory>> = 
         historyDao.getHistoryForBook(bookId)
 
@@ -66,6 +69,7 @@ class BookRepository(private val database: AppDatabase) {
         historyDao.deleteHistory(history)
     }
 
+    // --- Reading Goal Operations ---
     fun getGoalForPeriod(type: String, value: String): Flow<ReadingGoal?> = 
         goalDao.getGoalForPeriod(type, value)
 
@@ -78,7 +82,7 @@ class BookRepository(private val database: AppDatabase) {
     }
 
     /**
-     * Updates a book's status and automatically registers status-change history logs.
+     * [트랜잭션 복합 연산 1] 도서 상태 변경 및 이력 데이터 트랜잭션 동기화
      */
     suspend fun updateBookStatus(bookId: Int, newStatus: String, changeDate: String) = withContext(Dispatchers.IO) {
         database.withTransaction {
@@ -100,7 +104,7 @@ class BookRepository(private val database: AppDatabase) {
     }
 
     /**
-     * Inserts a book and its starting history log/reading session in a single database transaction.
+     * [트랜잭션 복합 연산 2] 도서 등록, 초기 상태 로그 및 독서 첫 세션 원자적 통합 추가
      */
     suspend fun insertBookWithSessionAndHistory(
         book: Book,
