@@ -37,6 +37,7 @@ import com.example.data.model.Book
 import com.example.data.model.ReadingSession
 import com.example.data.model.formatDate
 import com.example.ui.viewmodel.BookViewModel
+import com.example.ui.viewmodel.MonthStats
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -89,8 +90,9 @@ fun HomeScreen(
     val currentMonthKey = remember(calendar) {
         SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
     }
-    val stats = remember(books, sessions, calendar) {
-        viewModel.getMonthStats(currentMonthKey)
+    // Calculate current month stats dynamically off Main thread
+    val stats by produceState(initialValue = MonthStats(0, 0, 0), books, sessions, calendar) {
+        value = viewModel.getMonthStats(currentMonthKey)
     }
 
     Scaffold(

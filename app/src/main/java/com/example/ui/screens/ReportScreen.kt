@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Book
 import com.example.ui.viewmodel.BookViewModel
+import com.example.ui.viewmodel.MonthStats
+import com.example.ui.viewmodel.TrendItem
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -64,9 +66,15 @@ fun ReportScreen(
         SimpleDateFormat("M월", Locale.getDefault()).format(Date())
     }
 
-    val stats = remember(books, sessions) { viewModel.getMonthStats(currentMonthKey) }
-    val categoryPercentages = remember(books, sessions) { viewModel.getCategoryPercentages(currentMonthKey) }
-    val trendData = remember(books, sessions) { viewModel.getMonthlyTrendData() }
+    val stats by produceState(initialValue = MonthStats(0, 0, 0), books, sessions) {
+        value = viewModel.getMonthStats(currentMonthKey)
+    }
+    val categoryPercentages by produceState(initialValue = emptyMap<String, Float>(), books, sessions) {
+        value = viewModel.getCategoryPercentages(currentMonthKey)
+    }
+    val trendData by produceState(initialValue = emptyList<TrendItem>(), books, sessions) {
+        value = viewModel.getMonthlyTrendData()
+    }
 
     // Find top category
     val topCategory = remember(categoryPercentages) {

@@ -14,6 +14,8 @@ import com.example.data.model.*
 import com.example.data.repository.BookRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -616,7 +618,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun getMonthStats(monthValue: String): MonthStats {
+    suspend fun getMonthStats(monthValue: String): MonthStats = withContext(Dispatchers.Default) {
         // monthValue: "YYYY-MM" (e.g., "2026-06")
         val currentBooks = books.value
         val currentSessions = sessions.value
@@ -642,14 +644,14 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         // 3. Current streak (연속 독서일): Calculate current consecutive reading days up to today
         val streak = calculateStreak(currentSessions)
 
-        return MonthStats(
+        MonthStats(
             booksReadCount = completedBooksThisMonth,
             readingDaysCount = uniqueReadingDays,
             currentStreak = streak
         )
     }
 
-    fun getCategoryPercentages(monthValue: String): Map<String, Float> {
+    suspend fun getCategoryPercentages(monthValue: String): Map<String, Float> = withContext(Dispatchers.Default) {
         // Find categories for all books read/logged this month
         val currentBooks = books.value
         val currentSessions = sessions.value
@@ -660,7 +662,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
         val booksToAnalyze = currentBooks.filter { monthBookIds.contains(it.id) }
         if (booksToAnalyze.isEmpty()) {
-            return Book.CATEGORIES.associateWith { 0f }
+            return@withContext Book.CATEGORIES.associateWith { 0f }
         }
 
         val total = booksToAnalyze.size.toFloat()
@@ -670,10 +672,10 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         Book.CATEGORIES.forEach { cat ->
             fullMap[cat] = counts[cat] ?: 0f
         }
-        return fullMap
+        fullMap
     }
 
-    fun getMonthlyTrendData(): List<TrendItem> {
+    suspend fun getMonthlyTrendData(): List<TrendItem> = withContext(Dispatchers.Default) {
         // Get last 6 months trend
         val currentSessions = sessions.value
         val currentBooks = books.value
@@ -708,7 +710,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
-        return trendList
+        trendList
     }
 
     private fun calculateStreak(allSessions: List<ReadingSession>): Int {
