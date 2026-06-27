@@ -1,12 +1,14 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -934,6 +936,7 @@ fun SearchResultCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimulatedScannerDialog(
     onDismiss: () -> Unit,
@@ -948,86 +951,122 @@ fun SimulatedScannerDialog(
         Pair("9788934986614", "설민석의 한국사 대모험")
     )
 
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("닫기", color = Color(0xFF44403C), fontWeight = FontWeight.Bold)
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "바코드로 간편하게 등록하기",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF44403C)
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "닫기",
+                        tint = Color(0xFF44403C)
+                    )
+                }
             }
         },
-        title = { Text("바코드 스캐너 시뮬레이션", fontWeight = FontWeight.Bold, color = Color(0xFF44403C)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = "책 뒷면의 ISBN 바코드를 카메라에 인식시킵니다.",
+                    text = "책 뒷면의 ISBN 바코드를 카메라에 비추면 자동으로 등록됩니다.",
                     fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                    color = Color(0xFF44403C).copy(alpha = 0.7f)
+                    color = Color(0xFF44403C),
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 // Barcode simulation view box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black),
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xFF1E1B4B))
+                        .border(BorderStroke(2.dp, Color(0xFF8B5CF6).copy(alpha = alpha)), RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Visual scanning line decoration
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(Color.Red)
-                    )
                     Text(
-                        text = "[ 바코드 탐색 중... ]",
-                        color = Color.Green,
+                        text = "[ 바코드 스캔 준비 완료 ]",
+                        color = Color(0xFF8B5CF6).copy(alpha = alpha),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "시뮬레이션용 가상 도서 바코드를 선택하세요:",
-                    fontSize = 11.sp,
+                    text = "💡 터치해서 스캔 기능을 먼저 체험해 보세요",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF8B5CF6),
-                    modifier = Modifier.align(Alignment.Start)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    mockBooks.forEach { (isbn, title) ->
-                        Button(
-                            onClick = { onScanSuccess(isbn, title) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF44403C)),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF44403C))
-                                Text(text = "ISBN: $isbn", fontSize = 11.sp, color = Color(0xFF8B5CF6), fontWeight = FontWeight.Bold)
-                            }
+                    items(mockBooks) { (isbn, title) ->
+                        val displayName = when {
+                            title.contains("알사탕") -> "🍬 알사탕"
+                            title.contains("강아지 똥") -> "🐶 강아지 똥"
+                            title.contains("구름빵") -> "☁️ 구름빵"
+                            title.contains("마당을 나온 암탉") -> "🐓 마당을 나온 암탉"
+                            else -> "📚 한국사 대모험"
                         }
+                        
+                        FilterChip(
+                            selected = false,
+                            onClick = { onScanSuccess(isbn, title) },
+                            label = {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = displayName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF44403C)
+                                    )
+                                    Text(
+                                        text = "ISBN: $isbn",
+                                        fontSize = 9.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Color(0xFFF5F5F4),
+                                labelColor = Color(0xFF44403C)
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
                     }
                 }
             }
