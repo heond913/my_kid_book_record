@@ -33,9 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.data.api.BookSearchResult
-import com.example.data.api.SearchMode
-import com.example.data.model.Book
+import com.example.data.model.BookUiModel
+import com.example.data.model.BookEntity
 import com.example.ui.viewmodel.BookViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

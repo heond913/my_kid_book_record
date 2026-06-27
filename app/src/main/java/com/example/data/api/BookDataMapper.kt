@@ -18,8 +18,8 @@ object BookDataMapper {
         }
     }
 
-    fun parseGoogleBooksResponse(bodyString: String): List<BookSearchResult> {
-        val results = mutableListOf<BookSearchResult>()
+    fun parseGoogleBooksResponse(bodyString: String): List<BookDto> {
+        val results = mutableListOf<BookDto>()
         try {
             val json = JSONObject(bodyString)
             val items = json.optJSONArray("items") ?: return emptyList()
@@ -75,7 +75,7 @@ object BookDataMapper {
                 val description = volumeInfo.optString("description", "")
 
                 results.add(
-                    BookSearchResult(
+                    BookDto(
                         title = title,
                         author = author,
                         publisher = publisher,
@@ -93,8 +93,8 @@ object BookDataMapper {
         return results
     }
 
-    fun parseGeminiResponse(bodyString: String, modelName: String): List<BookSearchResult> {
-        val results = mutableListOf<BookSearchResult>()
+    fun parseGeminiResponse(bodyString: String, modelName: String): List<BookDto> {
+        val results = mutableListOf<BookDto>()
         try {
             val responseJson = JSONObject(bodyString)
             val candidates = responseJson.optJSONArray("candidates") ?: return emptyList()
@@ -129,7 +129,7 @@ object BookDataMapper {
                 }
 
                 results.add(
-                    BookSearchResult(
+                    BookDto(
                         title = bookObj.optString("title", "알 수 없는 제목"),
                         author = authorStr,
                         publisher = bookObj.optString("publisher", "알 수 없는 출판사"),

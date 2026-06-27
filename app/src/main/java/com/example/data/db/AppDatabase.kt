@@ -10,7 +10,7 @@ import com.example.data.model.*
 
 @Database(
     entities = [
-        Book::class,
+        BookEntity::class,
         ReadingSession::class,
         BookPhoto::class,
         StatusHistory::class,

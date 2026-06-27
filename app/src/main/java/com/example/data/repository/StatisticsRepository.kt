@@ -25,7 +25,7 @@ class StatisticsRepository {
      */
     suspend fun getMonthStats(
         monthValue: String, 
-        books: List<Book>, 
+        books: List<BookUiModel>, 
         sessions: List<ReadingSession>
     ): MonthStats = withContext(Dispatchers.Default) {
         // monthValue: "YYYY-MM" (e.g., "2026-06")
@@ -40,7 +40,7 @@ class StatisticsRepository {
 
         // 2. Count of completed books this month
         val completedBooksThisMonth = books.filter { book ->
-            book.status == Book.STATUS_COMPLETED && (
+            book.status == BookEntity.STATUS_COMPLETED && (
                 monthSessions.any { it.bookId == book.id } || 
                 formatTimestamp(book.addedTimestamp, "yyyy-MM") == monthValue
             )
@@ -61,7 +61,7 @@ class StatisticsRepository {
      */
     suspend fun getCategoryPercentages(
         monthValue: String, 
-        books: List<Book>, 
+        books: List<BookUiModel>, 
         sessions: List<ReadingSession>
     ): Map<String, Float> = withContext(Dispatchers.Default) {
         val monthBookIds = sessions.filter {
@@ -70,14 +70,14 @@ class StatisticsRepository {
 
         val booksToAnalyze = books.filter { monthBookIds.contains(it.id) }
         if (booksToAnalyze.isEmpty()) {
-            return@withContext Book.CATEGORIES.associateWith { 0f }
+            return@withContext BookEntity.CATEGORIES.associateWith { 0f }
         }
 
         val total = booksToAnalyze.size.toFloat()
         val counts = booksToAnalyze.groupBy { it.category }.mapValues { it.value.size / total }
         
         val fullMap = mutableMapOf<String, Float>()
-        Book.CATEGORIES.forEach { cat ->
+        BookEntity.CATEGORIES.forEach { cat ->
             fullMap[cat] = counts[cat] ?: 0f
         }
         fullMap
@@ -87,7 +87,7 @@ class StatisticsRepository {
      * 최근 6개월간의 월별 세션 수 및 완독 도서량 트렌드 아이템 목록을 산출합니다.
      */
     suspend fun getMonthlyTrendData(
-        books: List<Book>, 
+        books: List<BookUiModel>, 
         sessions: List<ReadingSession>
     ): List<TrendItem> = withContext(Dispatchers.Default) {
         val format = SimpleDateFormat("yyyy-MM", Locale.getDefault())
@@ -106,7 +106,7 @@ class StatisticsRepository {
 
             // Completed books in this month
             val monthCompCount = books.filter { book ->
-                book.status == Book.STATUS_COMPLETED && (
+                book.status == BookEntity.STATUS_COMPLETED && (
                     sessions.any { it.bookId == book.id && isSameMonth(it.startDate, monthKey) } ||
                     formatTimestamp(book.addedTimestamp, "yyyy-MM") == monthKey
                 )

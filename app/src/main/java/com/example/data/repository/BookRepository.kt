@@ -24,24 +24,24 @@ class BookRepository(private val database: AppDatabase) {
     private val goalDao = database.goalDao()
 
     // --- State Streams (Data Observation Flow) ---
-    val allBooks: Flow<List<Book>> = bookDao.getAllBooks()
+    val allBooks: Flow<List<BookEntity>> = bookDao.getAllBooks()
     val allSessions: Flow<List<ReadingSession>> = sessionDao.getAllSessions()
     val allGoals: Flow<List<ReadingGoal>> = goalDao.getAllGoals()
 
     // --- Core Book DB Operations ---
-    suspend fun getBookById(id: Int): Book? = withContext(Dispatchers.IO) {
+    suspend fun getBookById(id: Int): BookEntity? = withContext(Dispatchers.IO) {
         bookDao.getBookById(id)
     }
 
-    suspend fun insertBook(book: Book): Long = withContext(Dispatchers.IO) {
+    suspend fun insertBook(book: BookEntity): Long = withContext(Dispatchers.IO) {
         bookDao.insertBook(book)
     }
 
-    suspend fun updateBook(book: Book) = withContext(Dispatchers.IO) {
+    suspend fun updateBook(book: BookEntity) = withContext(Dispatchers.IO) {
         bookDao.updateBook(book)
     }
 
-    suspend fun deleteBook(book: Book) = withContext(Dispatchers.IO) {
+    suspend fun deleteBook(book: BookEntity) = withContext(Dispatchers.IO) {
         bookDao.deleteBook(book)
     }
 
@@ -107,7 +107,7 @@ class BookRepository(private val database: AppDatabase) {
      * [트랜잭션 복합 연산 2] 도서 등록, 초기 상태 로그 및 독서 첫 세션 원자적 통합 추가
      */
     suspend fun insertBookWithSessionAndHistory(
-        book: Book,
+        book: BookEntity,
         status: String,
         selectedDateStr: String
     ): Long = withContext(Dispatchers.IO) {
@@ -122,8 +122,8 @@ class BookRepository(private val database: AppDatabase) {
             )
             historyDao.insertHistory(history)
             
-            if (status == Book.STATUS_READING || status == Book.STATUS_COMPLETED) {
-                val memo = if (status == Book.STATUS_COMPLETED) {
+            if (status == BookEntity.STATUS_READING || status == BookEntity.STATUS_COMPLETED) {
+                val memo = if (status == BookEntity.STATUS_COMPLETED) {
                     "완독하여 독서 포트폴리오에 첫 발자국을 남겼어요! 🥳"
                 } else {
                     "책을 읽기 시작했어요! 🌱"
@@ -132,10 +132,10 @@ class BookRepository(private val database: AppDatabase) {
                     bookId = bookId.toInt(),
                     startDate = parseDate(selectedDateStr),
                     endDate = parseDate(selectedDateStr),
-                    title = if (status == Book.STATUS_COMPLETED) "완독 축하!" else "독서 시작",
+                    title = if (status == BookEntity.STATUS_COMPLETED) "완독 축하!" else "독서 시작",
                     memo = memo,
                     rating = 5,
-                    tags = if (status == Book.STATUS_COMPLETED) "완독,성공" else "시작,독서"
+                    tags = if (status == BookEntity.STATUS_COMPLETED) "완독,성공" else "시작,독서"
                 )
                 sessionDao.insertSession(session)
             }

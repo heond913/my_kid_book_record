@@ -23,7 +23,7 @@ fun parseDate(dateStr: String?): Date {
 }
 
 @Entity(tableName = "books")
-data class Book(
+data class BookEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val author: String,
@@ -43,6 +43,52 @@ data class Book(
 
         val CATEGORIES = listOf("동화", "과학", "역사", "문학", "기타")
     }
+}
+
+data class BookUiModel(
+    val id: Int = 0,
+    val title: String,
+    val author: String,
+    val publisher: String,
+    val publishDate: String,
+    val isbn: String,
+    val category: String,
+    val coverUrl: String? = null,
+    val status: String = BookEntity.STATUS_READING,
+    val addedTimestamp: Long = System.currentTimeMillis(),
+    val childName: String = ""
+)
+
+fun BookEntity.toUiModel(): BookUiModel {
+    return BookUiModel(
+        id = id,
+        title = title,
+        author = author,
+        publisher = publisher,
+        publishDate = publishDate,
+        isbn = isbn,
+        category = category,
+        coverUrl = coverUrl,
+        status = status,
+        addedTimestamp = addedTimestamp,
+        childName = childName
+    )
+}
+
+fun BookUiModel.toEntity(): BookEntity {
+    return BookEntity(
+        id = id,
+        title = title,
+        author = author,
+        publisher = publisher,
+        publishDate = publishDate,
+        isbn = isbn,
+        category = category,
+        coverUrl = coverUrl,
+        status = status,
+        addedTimestamp = addedTimestamp,
+        childName = childName
+    )
 }
 
 @Entity(tableName = "reading_sessions")

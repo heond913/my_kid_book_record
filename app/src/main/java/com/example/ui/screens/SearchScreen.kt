@@ -41,8 +41,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.data.model.Book
-import com.example.data.api.BookSearchResult
+import com.example.data.model.BookUiModel
+import com.example.data.model.BookEntity
 import com.example.data.api.SearchMode
 import com.example.ui.viewmodel.BookViewModel
 import java.util.UUID
@@ -512,7 +512,7 @@ fun SearchScreen(
                                     shape = RoundedCornerShape(16.dp)
                                 )
                             }
-                            items(Book.CATEGORIES) { cat ->
+                            items(BookEntity.CATEGORIES) { cat ->
                                 FilterChip(
                                     selected = selectedCategory == cat,
                                     onClick = { selectedCategory = cat },
@@ -535,8 +535,8 @@ fun SearchScreen(
                         ) {
                             val statusList = listOf(
                                 null to "전체 상태",
-                                Book.STATUS_READING to "읽는 중",
-                                Book.STATUS_COMPLETED to "완독"
+                                BookEntity.STATUS_READING to "읽는 중",
+                                BookEntity.STATUS_COMPLETED to "완독"
                             )
                             items(statusList) { (status, label) ->
                                 FilterChip(
@@ -904,7 +904,7 @@ fun SearchScreen(
                                                     isbn = safeIsbn,
                                                     category = result.category.ifEmpty { "창작그림책" },
                                                     coverUrl = result.coverUrl,
-                                                    status = Book.STATUS_READING,
+                                                    status = BookEntity.STATUS_READING,
                                                     onSuccess = { insertedId ->
                                                         onNavigateToBookDetail(insertedId)
                                                     }
@@ -924,7 +924,7 @@ fun SearchScreen(
 
 @Composable
 fun BookGridCard(
-    book: Book,
+    book: BookUiModel,
     onClick: () -> Unit
 ) {
     Card(
@@ -966,13 +966,13 @@ fun BookGridCard(
 
                 // Floating Status Tag
                 val statusLabel = when (book.status) {
-                    Book.STATUS_WANT_TO_READ -> "읽고싶은"
-                    Book.STATUS_READING -> "읽는중"
+                    BookEntity.STATUS_WANT_TO_READ -> "읽고싶은"
+                    BookEntity.STATUS_READING -> "읽는중"
                     else -> "완독✨"
                 }
                 val statusColor = when (book.status) {
-                    Book.STATUS_WANT_TO_READ -> Color(0xFF90A4AE)
-                    Book.STATUS_READING -> Color(0xFF64B5F6)
+                    BookEntity.STATUS_WANT_TO_READ -> Color(0xFF90A4AE)
+                    BookEntity.STATUS_READING -> Color(0xFF64B5F6)
                     else -> Color(0xFF81C784)
                 }
 
@@ -1031,7 +1031,7 @@ fun BookGridCard(
 
 @Composable
 fun OnlineBookGridCard(
-    result: BookSearchResult,
+    result: BookUiModel,
     onRegisterClick: () -> Unit
 ) {
     Card(

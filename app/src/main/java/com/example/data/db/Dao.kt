@@ -7,19 +7,19 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface BookDao {
     @Query("SELECT * FROM books ORDER BY addedTimestamp DESC")
-    fun getAllBooks(): Flow<List<Book>>
+    fun getAllBooks(): Flow<List<BookEntity>>
 
     @Query("SELECT * FROM books WHERE id = :id")
-    suspend fun getBookById(id: Int): Book?
+    suspend fun getBookById(id: Int): BookEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertBook(book: Book): Long
+    suspend fun insertBook(book: BookEntity): Long
 
     @Update
-    suspend fun updateBook(book: Book)
+    suspend fun updateBook(book: BookEntity)
 
     @Delete
-    suspend fun deleteBook(book: Book)
+    suspend fun deleteBook(book: BookEntity)
 }
 
 @Dao

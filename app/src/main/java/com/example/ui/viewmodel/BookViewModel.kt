@@ -7,8 +7,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.data.api.BookSearchResult
+import com.example.data.api.BookDto
 import com.example.data.api.SearchMode
+import com.example.data.api.toUiModel
+import com.example.data.api.toEntity
 import com.example.data.model.*
 import com.example.data.db.AppDatabase
 import com.example.data.repository.BookRepository
@@ -24,7 +26,7 @@ import java.util.*
 sealed interface SearchUiState {
     object Idle : SearchUiState
     object Loading : SearchUiState
-    data class Success(val results: List<BookSearchResult>) : SearchUiState
+    data class Success(val results: List<BookUiModel>) : SearchUiState
     data class Error(val exceptionMessage: String) : SearchUiState
     object Empty : SearchUiState
 }
@@ -48,7 +50,7 @@ class BookViewModel(
 ) : AndroidViewModel(application) {
 
     private val sharedPrefs = application.getSharedPreferences("book_journal_prefs", Context.MODE_PRIVATE)
-    private val searchCache = mutableMapOf<Pair<String, SearchMode>, List<BookSearchResult>>()
+    private val searchCache = mutableMapOf<Pair<String, SearchMode>, List<BookUiModel>>()
     var lastQuery: String = ""
     var lastSearchMode: SearchMode = SearchMode.ALL
     var lastSearchQuery: String = ""
@@ -248,11 +250,11 @@ class BookViewModel(
     }
 
     // --- Dynamic Data Observations (Reactive UI streams) ---
-    val books: StateFlow<List<Book>> = bookRepository.allBooks
+    val books: StateFlow<List<BookUiModel>> = bookRepository.allBooks
         .combine(childNameState) { allBooks, currentChildName ->
             allBooks.filter { book ->
                 book.childName == currentChildName || book.childName.isEmpty()
-            }
+            }.map { it.toUiModel() }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -277,7 +279,7 @@ class BookViewModel(
     private val _searchUiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val searchUiState: StateFlow<SearchUiState> = _searchUiState.asStateFlow()
 
-    val searchResults: StateFlow<List<BookSearchResult>> = _searchUiState
+    val searchResults: StateFlow<List<BookUiModel>> = _searchUiState
         .map { state ->
             when (state) {
                 is SearchUiState.Success -> state.results
@@ -293,8 +295,8 @@ class BookViewModel(
     val recentSearches: StateFlow<List<String>> = _recentSearches.asStateFlow()
 
     // --- Active states for Detail/Add screens ---
-    private val _selectedBook = MutableStateFlow<Book?>(null)
-    val selectedBook: StateFlow<Book?> = _selectedBook.asStateFlow()
+    private val _selectedBook = MutableStateFlow<BookUiModel?>(null)
+    val selectedBook: StateFlow<BookUiModel?> = _selectedBook.asStateFlow()
 
     private val _selectedBookSessions = MutableStateFlow<List<ReadingSession>>(emptyList())
     val selectedBookSessions: StateFlow<List<ReadingSession>> = _selectedBookSessions.asStateFlow()
@@ -306,7 +308,7 @@ class BookViewModel(
     val selectedBookHistory: StateFlow<List<StatusHistory>> = _selectedBookHistory.asStateFlow()
 
     // Recent books fast access
-    val fastAccessBooks: StateFlow<List<Book>> = books.map { list ->
+    val fastAccessBooks: StateFlow<List<BookUiModel>> = books.map { list ->
         list.take(5)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -318,7 +320,7 @@ class BookViewModel(
 
     fun selectBook(bookId: Int) {
         viewModelScope.launch {
-            val book = bookRepository.getBookById(bookId)
+            val book = bookRepository.getBookById(bookId)?.toUiModel()
             _selectedBook.value = book
             if (book != null) {
                 bookRepository.getSessionsForBook(bookId).collect {
@@ -346,12 +348,12 @@ class BookViewModel(
         isbn: String,
         category: String,
         coverUrl: String? = null,
-        status: String = Book.STATUS_READING,
+        status: String = BookEntity.STATUS_READING,
         readingDateStr: String? = null,
         onSuccess: (Int) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val book = Book(
+            val book = BookEntity(
                 title = title,
                 author = author,
                 publisher = publisher,
@@ -368,9 +370,9 @@ class BookViewModel(
         }
     }
 
-    fun updateBook(book: Book) {
+    fun updateBook(book: BookUiModel) {
         viewModelScope.launch {
-            bookRepository.updateBook(book)
+            bookRepository.updateBook(book.toEntity())
             if (_selectedBook.value?.id == book.id) {
                 _selectedBook.value = book
             }
@@ -381,14 +383,14 @@ class BookViewModel(
         viewModelScope.launch {
             val today = getFormattedToday()
             bookRepository.updateBookStatus(bookId, newStatus, today)
-            val updated = bookRepository.getBookById(bookId)
+            val updated = bookRepository.getBookById(bookId)?.toUiModel()
             _selectedBook.value = updated
         }
     }
 
-    fun deleteBook(book: Book) {
+    fun deleteBook(book: BookUiModel) {
         viewModelScope.launch {
-            bookRepository.deleteBook(book)
+            bookRepository.deleteBook(book.toEntity())
             if (_selectedBook.value?.id == book.id) {
                 _selectedBook.value = null
             }
@@ -540,8 +542,9 @@ class BookViewModel(
                 if (unifiedResults.isEmpty()) {
                     _searchUiState.value = SearchUiState.Empty
                 } else {
-                    searchCache[cacheKey] = unifiedResults
-                    _searchUiState.value = SearchUiState.Success(unifiedResults)
+                    val uiModels = unifiedResults.map { it.toUiModel() }
+                    searchCache[cacheKey] = uiModels
+                    _searchUiState.value = SearchUiState.Success(uiModels)
                 }
             } catch (e: Exception) {
                 Log.e("BookViewModel", "Search failure", e)

@@ -2,7 +2,7 @@ package com.example.data.repository
 
 import android.util.Log
 import com.example.data.api.BookSearchCoordinator
-import com.example.data.api.BookSearchResult
+import com.example.data.api.BookDto
 import com.example.data.api.SearchMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,7 +24,7 @@ class BookSearchRepository {
     /**
      * 외부 API(Google Books) 및 Gemini AI 통합 검색을 수행하고 안전한 도서 검색 결과를 보장합니다.
      */
-    suspend fun performUnifiedSearch(query: String, searchMode: SearchMode = SearchMode.ALL): List<BookSearchResult> = 
+    suspend fun performUnifiedSearch(query: String, searchMode: SearchMode = SearchMode.ALL): List<BookDto> = 
         withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Executing unified book search in repository for query: $query, mode: $searchMode")
@@ -44,7 +44,7 @@ class BookSearchRepository {
     /**
      * 특정 쿼리에 매핑되는 정적 로컬 폴백 데이터셋을 직접 쿼리합니다.
      */
-    fun getLocalFallbackResults(query: String): List<BookSearchResult> {
+    fun getLocalFallbackResults(query: String): List<BookDto> {
         return try {
             BookSearchCoordinator.getLocalFallbackResults(query)
         } catch (e: Exception) {

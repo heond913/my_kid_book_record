@@ -1,6 +1,9 @@
 package com.example.data.api
 
-data class BookSearchResult(
+import com.example.data.model.BookEntity
+import com.example.data.model.BookUiModel
+
+data class BookDto(
     val title: String,
     val author: String,
     val publisher: String,
@@ -11,6 +14,40 @@ data class BookSearchResult(
     val description: String = ""
 )
 
+fun BookDto.toUiModel(): BookUiModel {
+    return BookUiModel(
+        title = title,
+        author = author,
+        publisher = publisher,
+        publishDate = publishDate,
+        isbn = isbn,
+        category = category,
+        coverUrl = coverUrl,
+        status = BookEntity.STATUS_READING,
+        addedTimestamp = System.currentTimeMillis(),
+        childName = ""
+    )
+}
+
+fun BookDto.toEntity(
+    status: String = BookEntity.STATUS_READING,
+    addedTimestamp: Long = System.currentTimeMillis(),
+    childName: String = ""
+): BookEntity {
+    return BookEntity(
+        title = title,
+        author = author,
+        publisher = publisher,
+        publishDate = publishDate,
+        isbn = isbn,
+        category = category,
+        coverUrl = coverUrl,
+        status = status,
+        addedTimestamp = addedTimestamp,
+        childName = childName
+    )
+}
+
 enum class SearchMode {
     ALL,      // Google Books + Gemini 통합 검색
     GOOGLE,   // Google Books 단독 검색
@@ -20,7 +57,7 @@ enum class SearchMode {
 
 object BookSearchService {
     
-    fun getLocalFallbackResults(query: String): List<BookSearchResult> {
+    fun getLocalFallbackResults(query: String): List<BookDto> {
         return BookSearchCoordinator.getLocalFallbackResults(query)
     }
 
@@ -28,7 +65,7 @@ object BookSearchService {
         query: String,
         startTime: Long = System.currentTimeMillis(),
         timeoutMs: Long = 10000L
-    ): List<BookSearchResult> {
+    ): List<BookDto> {
         return BookSearchCoordinator.searchGoogleBooks(query, startTime, timeoutMs)
     }
 
@@ -36,14 +73,14 @@ object BookSearchService {
         query: String,
         startTime: Long = System.currentTimeMillis(),
         timeoutMs: Long = 10000L
-    ): List<BookSearchResult> {
+    ): List<BookDto> {
         return BookSearchCoordinator.searchWithGemini(query, startTime, timeoutMs)
     }
 
     suspend fun performUnifiedSearch(
         query: String,
         searchMode: SearchMode = SearchMode.ALL
-    ): List<BookSearchResult> {
+    ): List<BookDto> {
         return BookSearchCoordinator.performUnifiedSearch(query, searchMode)
     }
 }
