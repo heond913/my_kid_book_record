@@ -246,10 +246,6 @@ class BookViewModel(
         }
     }
 
-    init {
-        loadRecentSearches()
-    }
-
     // --- Dynamic Data Observations (Reactive UI streams) ---
     val books: StateFlow<List<Book>> = bookRepository.allBooks
         .combine(childNameState) { allBooks, currentChildName ->
@@ -312,6 +308,10 @@ class BookViewModel(
     val fastAccessBooks: StateFlow<List<Book>> = books.map { list ->
         list.take(5)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        loadRecentSearches()
+    }
 
     // --- Core Operations (Delegated to specialized repositories) ---
 
