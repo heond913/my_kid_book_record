@@ -106,6 +106,38 @@ fun AddBookScreen(
         ).show()
     }
 
+    var readingDate by remember {
+        val sdf = java.text.SimpleDateFormat("yy/MM/dd", java.util.Locale.getDefault())
+        mutableStateOf(sdf.format(java.util.Date()))
+    }
+
+    fun showReadingDatePicker() {
+        val calendar = java.util.Calendar.getInstance()
+        try {
+            val sdf = java.text.SimpleDateFormat("yy/MM/dd", java.util.Locale.getDefault())
+            val date = sdf.parse(readingDate)
+            if (date != null) {
+                calendar.time = date
+            }
+        } catch (e: Exception) {}
+
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                val cal = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.YEAR, year)
+                    set(java.util.Calendar.MONTH, month)
+                    set(java.util.Calendar.DAY_OF_MONTH, day)
+                }
+                val sdf = java.text.SimpleDateFormat("yy/MM/dd", java.util.Locale.getDefault())
+                readingDate = sdf.format(cal.time)
+            },
+            calendar.get(java.util.Calendar.YEAR),
+            calendar.get(java.util.Calendar.MONTH),
+            calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     Scaffold(
         containerColor = creamBgColor,
         topBar = {
@@ -146,6 +178,7 @@ fun AddBookScreen(
                                     category = category,
                                     coverUrl = coverUrl.ifBlank { null },
                                     status = initialStatus,
+                                    readingDateStr = readingDate,
                                     onSuccess = onSuccess
                                 )
                             }
@@ -644,6 +677,41 @@ fun AddBookScreen(
                                 )
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // [읽은 날짜 설정 Form Group]
+                    Text(
+                        text = "읽은 날짜",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = darkBrownColor
+                    )
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = readingDate,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("독서 등록일 (과거 날짜 선택 가능)") },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "달력 선택",
+                                    tint = darkBrownColor
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = textFieldColors
+                        )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { showReadingDatePicker() }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(48.dp)) // Padding to scroll comfortably past the fixed CTA button

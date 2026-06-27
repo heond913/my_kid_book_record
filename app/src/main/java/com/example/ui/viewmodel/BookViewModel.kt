@@ -336,6 +336,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         category: String,
         coverUrl: String? = null,
         status: String = Book.STATUS_READING,
+        readingDateStr: String? = null,
         onSuccess: (Int) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -350,7 +351,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
                 status = status,
                 childName = getChildName()
             )
-            val selectedDateStr = getFormattedDate(_selectedDate.value)
+            val selectedDateStr = readingDateStr ?: getFormattedDate(_selectedDate.value)
             val id = repository.insertBookWithSessionAndHistory(book, status, selectedDateStr).toInt()
             onSuccess(id)
         }
