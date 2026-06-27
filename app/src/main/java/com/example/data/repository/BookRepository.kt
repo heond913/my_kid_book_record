@@ -70,20 +70,22 @@ class BookRepository(private val database: AppDatabase) {
      * Updates a book's status and automatically registers status-change history logs.
      */
     suspend fun updateBookStatus(bookId: Int, newStatus: String, changeDate: String) {
-        val book = bookDao.getBookById(bookId) ?: return
-        val oldStatus = book.status
-        if (oldStatus == newStatus) return
+        database.withTransaction {
+            val book = bookDao.getBookById(bookId) ?: return@withTransaction
+            val oldStatus = book.status
+            if (oldStatus == newStatus) return@withTransaction
 
-        val updatedBook = book.copy(status = newStatus)
-        bookDao.updateBook(updatedBook)
+            val updatedBook = book.copy(status = newStatus)
+            bookDao.updateBook(updatedBook)
 
-        val history = StatusHistory(
-            bookId = bookId,
-            fromStatus = oldStatus,
-            toStatus = newStatus,
-            changeDate = changeDate
-        )
-        historyDao.insertHistory(history)
+            val history = StatusHistory(
+                bookId = bookId,
+                fromStatus = oldStatus,
+                toStatus = newStatus,
+                changeDate = changeDate
+            )
+            historyDao.insertHistory(history)
+        }
     }
 
     /**
