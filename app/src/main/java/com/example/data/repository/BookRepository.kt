@@ -82,7 +82,7 @@ class BookRepository(private val database: AppDatabase) {
                 bookId = bookId,
                 fromStatus = oldStatus,
                 toStatus = newStatus,
-                changeDate = changeDate
+                changeDate = parseDate(changeDate)
             )
             historyDao.insertHistory(history)
         }
@@ -103,7 +103,7 @@ class BookRepository(private val database: AppDatabase) {
                 bookId = bookId.toInt(),
                 fromStatus = "등록",
                 toStatus = status,
-                changeDate = selectedDateStr
+                changeDate = parseDate(selectedDateStr)
             )
             historyDao.insertHistory(history)
             
@@ -115,8 +115,8 @@ class BookRepository(private val database: AppDatabase) {
                 }
                 val session = ReadingSession(
                     bookId = bookId.toInt(),
-                    startDate = selectedDateStr,
-                    endDate = selectedDateStr,
+                    startDate = parseDate(selectedDateStr),
+                    endDate = parseDate(selectedDateStr),
                     title = if (status == Book.STATUS_COMPLETED) "완독 축하!" else "독서 시작",
                     memo = memo,
                     rating = 5,

@@ -2,6 +2,25 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+fun formatDate(date: Date?): String {
+    if (date == null) return ""
+    return SimpleDateFormat("yy/MM/dd", Locale.getDefault()).format(date)
+}
+
+fun parseDate(dateStr: String?): Date {
+    if (dateStr.isNullOrBlank()) return Date()
+    val formats = listOf("yy/MM/dd", "yyyy-MM-dd", "yyyy/MM/dd", "yy-MM-dd")
+    for (f in formats) {
+        try {
+            return SimpleDateFormat(f, Locale.getDefault()).parse(dateStr) ?: continue
+        } catch (e: Exception) {}
+    }
+    return Date()
+}
 
 @Entity(tableName = "books")
 data class Book(
@@ -30,8 +49,8 @@ data class Book(
 data class ReadingSession(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val bookId: Int,
-    val startDate: String, // Format: YY/MM/DD, e.g. 26/06/01
-    val endDate: String,   // Format: YY/MM/DD, e.g. 26/06/03
+    val startDate: Date, // Date type
+    val endDate: Date,   // Date type
     val title: String? = null, // Optional session title, e.g. "1회차 기록"
     val memo: String,
     val rating: Int = 5,   // 1 to 5 stars
@@ -64,7 +83,7 @@ data class StatusHistory(
     val bookId: Int,
     val fromStatus: String,
     val toStatus: String,
-    val changeDate: String, // Format: YY/MM/DD
+    val changeDate: Date, // Date type
     val timestamp: Long = System.currentTimeMillis()
 )
 

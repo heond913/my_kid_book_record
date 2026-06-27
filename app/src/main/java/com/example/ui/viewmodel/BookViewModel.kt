@@ -413,8 +413,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val session = ReadingSession(
                 bookId = bookId,
-                startDate = startDate,
-                endDate = endDate,
+                startDate = parseDate(startDate),
+                endDate = parseDate(endDate),
                 title = title,
                 memo = memo,
                 rating = rating,
@@ -601,9 +601,8 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Utility calculations for Reports & Dashboard ---
 
-    private fun isSameMonth(dateStr: String, monthValue: String): Boolean {
+    private fun isSameMonth(date: Date, monthValue: String): Boolean {
         // monthValue: "yyyy-MM" (e.g., "2026-06")
-        val date = parseDateString(dateStr) ?: return false
         val calDate = Calendar.getInstance().apply { time = date }
         
         return try {
@@ -628,7 +627,7 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // 1. Reading days (독서일 수): Number of unique dates read
-        val uniqueReadingDays = monthSessions.map { it.startDate }.distinct().size
+        val uniqueReadingDays = monthSessions.map { formatDate(it.startDate) }.distinct().size
 
         // 2. Count of completed books this month
         // A book is counted as completed this month if its current status is COMPLETED and it has a session ending this month, 
@@ -715,13 +714,16 @@ class BookViewModel(application: Application) : AndroidViewModel(application) {
     private fun calculateStreak(allSessions: List<ReadingSession>): Int {
         if (allSessions.isEmpty()) return 0
         
-        // Parse all unique session start dates into timestamps
-        val dates = allSessions.mapNotNull {
-            try {
-                parseDateString(it.startDate)
-            } catch (e: Exception) {
-                null
+        // Parse all unique session start dates into normalized timestamps
+        val dates = allSessions.map {
+            val cal = Calendar.getInstance().apply {
+                time = it.startDate
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }
+            cal.time
         }.distinct().sortedDescending()
 
         if (dates.isEmpty()) return 0

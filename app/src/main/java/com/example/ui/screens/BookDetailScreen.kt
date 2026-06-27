@@ -39,6 +39,7 @@ import coil.compose.AsyncImage
 import com.example.data.model.Book
 import com.example.data.model.BookPhoto
 import com.example.data.model.ReadingSession
+import com.example.data.model.formatDate
 import com.example.ui.viewmodel.BookViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -285,7 +286,7 @@ fun BookDetailScreen(
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 Text(
-                                                    text = log.changeDate,
+                                                    text = formatDate(log.changeDate),
                                                     fontSize = 11.sp,
                                                     color = Color.Gray
                                                 )
@@ -643,7 +644,7 @@ fun SessionTimelineItem(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${session.startDate} ~ ${session.endDate}",
+                        text = "${formatDate(session.startDate)} ~ ${formatDate(session.endDate)}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Book
 import com.example.data.model.ReadingGoal
+import com.example.data.model.formatDate
 import com.example.ui.viewmodel.BookViewModel
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -943,7 +944,7 @@ fun calculateCompletedCountForPeriod(books: List<Book>, sessions: List<com.examp
             // Completed books that have matching end dates or addition dates in the goal YYYY-MM period
             books.filter { book ->
                 book.status == Book.STATUS_COMPLETED && (
-                    sessions.any { it.bookId == book.id && (it.startDate.contains(periodValue.substring(2)) || it.startDate.contains(periodValue)) } ||
+                    sessions.any { it.bookId == book.id && (formatDate(it.startDate).contains(periodValue.substring(2)) || formatDate(it.startDate).contains(periodValue)) } ||
                     formatLongTimestamp(book.addedTimestamp, "yyyy-MM") == periodValue
                 )
             }.size
@@ -962,7 +963,7 @@ fun calculateCompletedCountForPeriod(books: List<Book>, sessions: List<com.examp
             books.filter { book ->
                 book.status == Book.STATUS_COMPLETED && (
                     sessions.any { sess ->
-                        sess.bookId == book.id && months.any { sess.startDate.contains(it.substring(2)) || sess.startDate.contains(it) }
+                        sess.bookId == book.id && months.any { formatDate(sess.startDate).contains(it.substring(2)) || formatDate(sess.startDate).contains(it) }
                     } ||
                     months.contains(formatLongTimestamp(book.addedTimestamp, "yyyy-MM"))
                 )
@@ -973,7 +974,7 @@ fun calculateCompletedCountForPeriod(books: List<Book>, sessions: List<com.examp
             val year = periodValue
             books.filter { book ->
                 book.status == Book.STATUS_COMPLETED && (
-                    sessions.any { it.bookId == book.id && (it.startDate.contains(year.substring(2)) || it.startDate.contains(year)) } ||
+                    sessions.any { it.bookId == book.id && (formatDate(it.startDate).contains(year.substring(2)) || formatDate(it.startDate).contains(year)) } ||
                     formatLongTimestamp(book.addedTimestamp, "yyyy") == year
                 )
             }.size

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.Book
 import com.example.data.model.ReadingSession
+import com.example.data.model.formatDate
 import com.example.ui.viewmodel.BookViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -74,7 +75,7 @@ fun HomeScreen(
 
     // Parse session dates to associate with calendar
     val sessionsByDate = remember(sessions) {
-        sessions.groupBy { it.startDate }
+        sessions.groupBy { formatDate(it.startDate) }
     }
 
     // Get selected day sessions
@@ -767,7 +768,7 @@ fun ReadingSessionItemCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${session.startDate} ~ ${session.endDate}",
+                        text = "${formatDate(session.startDate)} ~ ${formatDate(session.endDate)}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
