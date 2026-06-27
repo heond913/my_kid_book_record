@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.example.BuildConfig
 import com.example.data.model.*
 
 @Database(
@@ -32,13 +33,18 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "kids_book_journal_db"
                 )
-                .fallbackToDestructiveMigration() // Reset cleanly if schemas change during prototyping
-                .build()
+                
+                // Only allow destructive migration in debug builds to protect user data in production
+                if (BuildConfig.DEBUG) {
+                    builder.fallbackToDestructiveMigration()
+                }
+                
+                val instance = builder.build()
                 INSTANCE = instance
                 instance
             }
